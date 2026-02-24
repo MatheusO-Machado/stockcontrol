@@ -1,0 +1,27 @@
+# Maven
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# IntelliJ (caso abra algum dia)
+.idea/
+/*.iml
+/*.ipr
+/*.iws
+/out/
+
+# VS Code
+.vscode/
+
+# Mac/Windows lixo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
