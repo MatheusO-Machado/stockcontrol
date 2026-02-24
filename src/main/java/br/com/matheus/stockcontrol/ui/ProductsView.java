@@ -3,14 +3,19 @@ package br.com.matheus.stockcontrol.ui;
 import br.com.matheus.stockcontrol.dao.ProductDao;
 import br.com.matheus.stockcontrol.model.Product;
 import javafx.collections.FXCollections;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 
 public class ProductsView extends BorderPane {
@@ -24,6 +29,11 @@ public class ProductsView extends BorderPane {
         var btnNew = new Button("Novo");
         var btnEdit = new Button("Editar");
         var btnDelete = new Button("Excluir");
+
+        btnNew.setOnAction(e -> {
+            openProductForm();
+            loadData(); // recarrega depois que o modal fecha
+        });
 
         setTop(new ToolBar(btnNew, btnEdit, btnDelete));
 
@@ -48,18 +58,31 @@ public class ProductsView extends BorderPane {
         colPrice.setPrefWidth(100);
 
         table.getColumns().addAll(colId, colName, colSku, colQty, colPrice);
-
         setCenter(table);
 
         loadData();
-
-        // Eventos (por enquanto só para mostrar que está ligado)
-        btnNew.setOnAction(e -> System.out.println("Novo (em breve abre formulário)"));
-        btnEdit.setOnAction(e -> System.out.println("Editar (em breve)"));
-        btnDelete.setOnAction(e -> System.out.println("Excluir (em breve)"));
     }
 
     private void loadData() {
         table.setItems(FXCollections.observableArrayList(dao.findAll()));
+    }
+
+    private void openProductForm() {
+    try {
+        FXMLLoader loader = new FXMLLoader(
+                getClass().getResource("/br/com/matheus/stockcontrol/ui/product_form.fxml")
+        );
+
+        javafx.scene.Parent root = loader.load(); // <-- aqui resolve o cast
+
+        Stage stage = new Stage();
+        stage.setTitle("Novo Produto");
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.setScene(new Scene(root));
+        stage.setResizable(false);
+        stage.showAndWait();
+    } catch (IOException e) {
+        throw new RuntimeException("Erro ao abrir formulário de produto", e);
+    }
     }
 }

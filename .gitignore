@@ -1,3 +1,6 @@
+# Database local
+/data/
+
 # Maven
 /target/
 !.mvn/wrapper/maven-wrapper.jar

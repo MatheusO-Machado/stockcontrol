@@ -37,4 +37,35 @@ public class ProductDao {
             throw new RuntimeException("Erro ao buscar produtos", e);
         }
     }
+    
+    public void insert(Product p) {
+        String sql = """
+            INSERT INTO products (name, sku, quantity, price_cents)
+            VALUES (?, ?, ?, ?)
+        """;
+
+        int priceCents = p.getPrice()
+                .movePointRight(2)
+                .intValueExact();
+
+        try (var conn = Database.getConnection();
+             var ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, p.getName());
+            ps.setString(2, p.getSku());
+            ps.setInt(3, p.getQuantity());
+            ps.setInt(4, priceCents);
+
+            ps.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            // mensagem melhor quando for SKU duplicado
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("unique") && msg.contains("sku")) {
+                throw new IllegalArgumentException("Já existe um produto com esse SKU.");
+            }
+            throw new RuntimeException("Erro ao inserir produto: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao inserir produto", e);
+        }
+    }
 }
