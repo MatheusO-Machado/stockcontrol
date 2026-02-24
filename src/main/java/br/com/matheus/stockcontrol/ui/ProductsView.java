@@ -14,6 +14,10 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import java.util.Optional;
+
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -32,7 +36,13 @@ public class ProductsView extends BorderPane {
 
         btnNew.setOnAction(e -> {
             openProductForm();
-            loadData(); // recarrega depois que o modal fecha
+            loadData();
+            // recarrega depois que o modal fecha
+        });
+        
+        btnDelete.setOnAction(e -> {
+            System.out.println("BOTAO EXCLUIR CLICADO");
+            onDelete();
         });
 
         setTop(new ToolBar(btnNew, btnEdit, btnDelete));
@@ -68,21 +78,67 @@ public class ProductsView extends BorderPane {
     }
 
     private void openProductForm() {
-    try {
-        FXMLLoader loader = new FXMLLoader(
-                getClass().getResource("/br/com/matheus/stockcontrol/ui/product_form.fxml")
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/br/com/matheus/stockcontrol/ui/product_form.fxml")
+            );
+
+            javafx.scene.Parent root = loader.load(); // <-- aqui resolve o cast
+
+            Stage stage = new Stage();
+            stage.setTitle("Novo Produto");
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.showAndWait();
+        } catch (IOException e) {
+            throw new RuntimeException("Erro ao abrir formulário de produto", e);
+        }
+    }
+    
+    private void onDelete() {
+        Product selected = table.getSelectionModel().getSelectedItem();
+        System.out.println("DELETE click - selected=" + selected);
+
+        if (selected == null) {
+            showInfo("Selecione um produto para excluir.");
+            return;
+        }
+
+        System.out.println("Selected id=" + selected.getId());
+
+        boolean confirmed = confirm(
+                "Confirmar exclusão",
+                "Excluir o produto: " + selected.getName() + " (SKU: " + selected.getSku() + ")?"
         );
 
-        javafx.scene.Parent root = loader.load(); // <-- aqui resolve o cast
+        System.out.println("Confirmed=" + confirmed);
 
-        Stage stage = new Stage();
-        stage.setTitle("Novo Produto");
-        stage.initModality(Modality.APPLICATION_MODAL);
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        stage.showAndWait();
-    } catch (IOException e) {
-        throw new RuntimeException("Erro ao abrir formulário de produto", e);
+        if (!confirmed) return;
+
+  
+        int rows = dao.deleteById(selected.getId());
+        System.out.println("Rows deleted=" + rows);
+        loadData();
     }
+
+    private void showInfo(String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Atenção");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
+
+    private boolean confirm(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        return result.isPresent() && result.get() == ButtonType.OK;
+    }
+    
+        
 }

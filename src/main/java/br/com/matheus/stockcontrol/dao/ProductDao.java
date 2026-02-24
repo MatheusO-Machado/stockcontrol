@@ -68,4 +68,17 @@ public class ProductDao {
             throw new RuntimeException("Erro ao inserir produto", e);
         }
     }
+    
+    public int deleteById(long id) {
+        String sql = "DELETE FROM products WHERE id = ?";
+
+        try (var conn = Database.getConnection();
+             var ps = conn.prepareStatement(sql)) {
+
+            ps.setLong(1, id);
+            return ps.executeUpdate(); // retorna 0 se não deletou nada
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao excluir produto", e);
+        }
+    }
 }
