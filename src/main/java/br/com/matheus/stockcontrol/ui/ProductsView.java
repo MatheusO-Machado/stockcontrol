@@ -17,6 +17,7 @@ import javafx.stage.Stage;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import java.util.Optional;
+import javafx.scene.Parent;
 
 
 import java.io.IOException;
@@ -40,11 +41,9 @@ public class ProductsView extends BorderPane {
             // recarrega depois que o modal fecha
         });
         
-        btnDelete.setOnAction(e -> {
-            System.out.println("BOTAO EXCLUIR CLICADO");
-            onDelete();
-        });
-
+        btnDelete.setOnAction(e -> onDelete());
+        btnEdit.setOnAction(e -> onEdit());
+        
         setTop(new ToolBar(btnNew, btnEdit, btnDelete));
 
         var colId = new TableColumn<Product, Long>("ID");
@@ -93,6 +92,40 @@ public class ProductsView extends BorderPane {
             stage.showAndWait();
         } catch (IOException e) {
             throw new RuntimeException("Erro ao abrir formulário de produto", e);
+        }
+    }
+    
+    private void onEdit() {
+        Product selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showInfo("Selecione um produto para editar.");
+            return;
+        }
+
+        openProductFormForEdit(selected);
+        loadData();
+    }
+    
+    private void openProductFormForEdit(Product product) {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/br/com/matheus/stockcontrol/ui/product_form.fxml")
+            );
+
+            Parent root = loader.load();
+
+            // pega o controller criado pelo FXMLLoader
+            br.com.matheus.stockcontrol.ui.controller.ProductFormController controller = loader.getController();
+            controller.setProductToEdit(product);
+
+            Stage stage = new Stage();
+            stage.setTitle("Editar Produto");
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.showAndWait();
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao abrir formulário de edição", e);
         }
     }
     

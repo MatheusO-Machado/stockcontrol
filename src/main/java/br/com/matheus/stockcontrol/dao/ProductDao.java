@@ -81,4 +81,39 @@ public class ProductDao {
             throw new RuntimeException("Erro ao excluir produto", e);
         }
     }
+    
+    public void update(Product p) {
+        String sql = """
+            UPDATE products
+            SET name = ?, sku = ?, quantity = ?, price_cents = ?
+            WHERE id = ?
+        """;
+
+        int priceCents = p.getPrice()
+                .movePointRight(2)
+                .intValueExact();
+
+        try (var conn = Database.getConnection();
+             var ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, p.getName());
+            ps.setString(2, p.getSku());
+            ps.setInt(3, p.getQuantity());
+            ps.setInt(4, priceCents);
+            ps.setLong(5, p.getId());
+
+            int rows = ps.executeUpdate();
+            if (rows == 0) {
+                throw new IllegalArgumentException("Produto não encontrado para atualizar.");
+            }
+        } catch (java.sql.SQLException e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("unique") && msg.contains("sku")) {
+                throw new IllegalArgumentException("Já existe um produto com esse SKU.");
+            }
+            throw new RuntimeException("Erro ao atualizar produto: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao atualizar produto", e);
+        }
+    }
 }

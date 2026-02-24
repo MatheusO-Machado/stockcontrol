@@ -3,6 +3,8 @@ package br.com.matheus.stockcontrol.ui.controller;
 import br.com.matheus.stockcontrol.dao.ProductDao;
 import br.com.matheus.stockcontrol.model.Product;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
@@ -12,6 +14,7 @@ import java.math.BigDecimal;
 
 public class ProductFormController {
 
+    @FXML private Label lblTitle;
     @FXML private TextField txtName;
     @FXML private TextField txtSku;
     @FXML private Spinner<Integer> spQuantity;
@@ -19,10 +22,25 @@ public class ProductFormController {
 
     private final ProductDao dao = new ProductDao();
 
+    // se null => modo "novo"; se não-null => modo "editar"
+    private Product editingProduct;
+
     @FXML
     private void initialize() {
-        // Spinner precisa de um "modelo" de valores; aqui: 0 até 1 milhão.
         spQuantity.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 1_000_000, 0));
+        setTitleNew();
+    }
+
+    // Chamado pela tela que abre o modal (ProductsView)
+    public void setProductToEdit(Product p) {
+        this.editingProduct = p;
+
+        lblTitle.setText("Editar Produto");
+
+        txtName.setText(p.getName());
+        txtSku.setText(p.getSku());
+        spQuantity.getValueFactory().setValue(p.getQuantity());
+        txtPrice.setText(p.getPrice() != null ? p.getPrice().toPlainString() : "0.00");
     }
 
     @FXML
@@ -32,7 +50,23 @@ public class ProductFormController {
 
     @FXML
     private void onSave() {
-        // 1) Ler e validar (validação simples por enquanto)
+        try {
+            Product p = readAndValidate();
+
+            if (editingProduct == null) {
+                dao.insert(p);
+            } else {
+                p.setId(editingProduct.getId()); // mantém o ID original
+                dao.update(p);
+            }
+
+            closeWindow();
+        } catch (Exception e) {
+            showError("Não foi possível salvar", e.getMessage() != null ? e.getMessage() : e.toString());
+        }
+    }
+
+    private Product readAndValidate() {
         String name = txtName.getText() != null ? txtName.getText().trim() : "";
         String sku = txtSku.getText() != null ? txtSku.getText().trim() : "";
         Integer qty = spQuantity.getValue();
@@ -46,24 +80,38 @@ public class ProductFormController {
             txtSku.requestFocus();
             throw new IllegalArgumentException("SKU é obrigatório.");
         }
+        if (priceText.isEmpty()) {
+            txtPrice.requestFocus();
+            throw new IllegalArgumentException("Preço é obrigatório.");
+        }
 
+        priceText = priceText.replace(",", ".");
         BigDecimal price;
         try {
-            // Aceita "199.90". (Depois melhoramos para aceitar vírgula também)
             price = new BigDecimal(priceText);
         } catch (Exception e) {
             txtPrice.requestFocus();
-            throw new IllegalArgumentException("Preço inválido. Use formato 199.90");
+            throw new IllegalArgumentException("Preço inválido. Exemplo: 199,90");
         }
 
-        // 2) Montar objeto
-        Product p = new Product(null, name, sku, qty != null ? qty : 0, price);
+        if (price.signum() < 0) {
+            txtPrice.requestFocus();
+            throw new IllegalArgumentException("Preço não pode ser negativo.");
+        }
 
-        // 3) Salvar no banco
-        dao.insert(p);
+        return new Product(null, name, sku, qty != null ? qty : 0, price);
+    }
 
-        // 4) Fechar janela
-        closeWindow();
+    private void setTitleNew() {
+        if (lblTitle != null) lblTitle.setText("Novo Produto");
+    }
+
+    private void showError(String title, String content) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(content);
+        alert.showAndWait();
     }
 
     private void closeWindow() {
