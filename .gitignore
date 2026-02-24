@@ -1,5 +1,7 @@
 # Database local
 /data/
+/*.db
+/target/
 
 # Maven
 /target/
