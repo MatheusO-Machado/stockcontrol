@@ -9,10 +9,8 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        var root = new ProductsView();
-        var scene = new Scene(root, 700, 400);
+        stage.setScene(new javafx.scene.Scene(new br.com.matheus.stockcontrol.ui.MainView(), 900, 600));
         stage.setTitle("StockControl");
-        stage.setScene(scene);
         stage.show();
     }
 

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="br.com.matheus.stockcontrol.ui.controller.MovementFormController"
+      spacing="10">
+
+    <padding>
+        <Insets top="12" right="12" bottom="12" left="12"/>
+    </padding>
+
+    <Label text="Nova Movimentação"
+           style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+
+    <!-- Cabeçalho -->
+    <GridPane hgap="10" vgap="10">
+        <columnConstraints>
+            <ColumnConstraints minWidth="120" />
+            <ColumnConstraints hgrow="ALWAYS" />
+        </columnConstraints>
+
+        <Label text="Tipo:" GridPane.rowIndex="0" GridPane.columnIndex="0" />
+        <ComboBox fx:id="cbType" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+
+        <Label text="Observação:" GridPane.rowIndex="1" GridPane.columnIndex="0" />
+        <TextField fx:id="txtObservation" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+    </GridPane>
+
+    <Separator/>
+
+    <!-- Adicionar item -->
+    <Label text="Adicionar item:" style="-fx-font-weight: bold;"/>
+
+    <GridPane hgap="10" vgap="10">
+        <columnConstraints>
+            <ColumnConstraints minWidth="120" />
+            <ColumnConstraints hgrow="ALWAYS" />
+        </columnConstraints>
+
+        <Label text="Produto:" GridPane.rowIndex="0" GridPane.columnIndex="0" />
+        <ComboBox fx:id="cbProduct" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+
+        <Label text="Quantidade:" GridPane.rowIndex="1" GridPane.columnIndex="0" />
+        <Spinner fx:id="spQuantity" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+
+        <Label text="Valor unitário:" GridPane.rowIndex="2" GridPane.columnIndex="0" />
+        <TextField fx:id="txtUnitPrice" promptText="Ex: 10,50"
+                   GridPane.rowIndex="2" GridPane.columnIndex="1" />
+
+        <Button fx:id="btnAddItem" text="Adicionar"
+                GridPane.rowIndex="3" GridPane.columnIndex="1" />
+    </GridPane>
+
+    <Separator/>
+
+    <!-- Itens -->
+    <Label text="Itens:" style="-fx-font-weight: bold;"/>
+    <TableView fx:id="tableItems" prefHeight="220"/>
+
+    <HBox spacing="10" alignment="CENTER_RIGHT">
+        <Label text="Total:" style="-fx-font-weight: bold;"/>
+        <Label fx:id="lblTotal" text="R$ 0,00" style="-fx-font-weight: bold;"/>
+    </HBox>
+
+    <HBox spacing="10" alignment="CENTER_RIGHT">
+        <Button text="Cancelar" onAction="#onCancel"/>
+        <Button fx:id="btnSave" text="Salvar" defaultButton="true" onAction="#onSave"/>
+    </HBox>
+</VBox>

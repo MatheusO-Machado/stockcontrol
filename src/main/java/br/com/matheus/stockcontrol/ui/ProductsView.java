@@ -1,36 +1,51 @@
 package br.com.matheus.stockcontrol.ui;
 
+import br.com.matheus.stockcontrol.dao.CategoryDao;
 import br.com.matheus.stockcontrol.dao.ProductDao;
+import br.com.matheus.stockcontrol.model.Category;
 import br.com.matheus.stockcontrol.model.Product;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
-import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.ToolBar;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
-import java.util.Optional;
-import javafx.scene.Parent;
+import javafx.fxml.FXMLLoader;
 
-
-import java.io.IOException;
 import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.util.Locale;
+import java.util.Optional;
 
 public class ProductsView extends BorderPane {
 
+    private final ProductDao productDao = new ProductDao();
+    private final CategoryDao categoryDao = new CategoryDao();
+
     private final TableView<Product> table = new TableView<>();
-    private final ProductDao dao = new ProductDao();
+
+    // filtros (B: dentro da tela)
+    private final TextField txtSearch = new TextField();
+    private final ComboBox<Category> cbCategoryFilter = new ComboBox<>();
+    private final Button btnClear = new Button("Limpar");
 
     public ProductsView() {
         setPadding(new Insets(10));
 
+        setTop(buildTop());
+        setCenter(buildTable());
+
+        loadCategoryFilter();
+        loadData(); // inicial
+    }
+
+    private Parent buildTop() {
+        // Barra de ações
         var btnNew = new Button("Novo");
         var btnEdit = new Button("Editar");
         var btnDelete = new Button("Excluir");
@@ -38,63 +53,97 @@ public class ProductsView extends BorderPane {
         btnNew.setOnAction(e -> {
             openProductForm();
             loadData();
-            // recarrega depois que o modal fecha
         });
-        
-        btnDelete.setOnAction(e -> onDelete());
+
         btnEdit.setOnAction(e -> onEdit());
-        
-        setTop(new ToolBar(btnNew, btnEdit, btnDelete));
+        btnDelete.setOnAction(e -> onDelete());
 
-        var colId = new TableColumn<Product, Long>("ID");
-        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
-        colId.setPrefWidth(60);
+        // Barra de filtros
+        txtSearch.setPromptText("Buscar por Nome ou SKU...");
+        txtSearch.setPrefWidth(280);
 
-        var colName = new TableColumn<Product, String>("Nome");
+        cbCategoryFilter.setPromptText("Categoria");
+        cbCategoryFilter.setPrefWidth(200);
+
+        btnClear.setOnAction(e -> {
+            txtSearch.clear();
+            cbCategoryFilter.getSelectionModel().clearSelection();
+            loadData();
+        });
+
+        ChangeListener<Object> refilter = (obs, oldVal, newVal) -> loadData();
+        txtSearch.textProperty().addListener(refilter);
+        cbCategoryFilter.valueProperty().addListener(refilter);
+
+        var filters = new HBox(10, new Label("Busca:"), txtSearch, new Label("Categoria:"), cbCategoryFilter, btnClear);
+        filters.setPadding(new Insets(0, 0, 10, 0));
+
+        var actions = new ToolBar(btnNew, btnEdit, btnDelete);
+
+        var box = new javafx.scene.layout.VBox(10, actions, filters);
+        return box;
+    }
+
+    private Parent buildTable() {
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+
+        TableColumn<Product, String> colName = new TableColumn<>("Nome");
         colName.setCellValueFactory(new PropertyValueFactory<>("name"));
-        colName.setPrefWidth(220);
 
-        var colSku = new TableColumn<Product, String>("SKU");
+        TableColumn<Product, String> colSku = new TableColumn<>("SKU");
         colSku.setCellValueFactory(new PropertyValueFactory<>("sku"));
-        colSku.setPrefWidth(120);
 
-        var colQty = new TableColumn<Product, Integer>("Qtd");
+        TableColumn<Product, String> colCategory = new TableColumn<>("Categoria");
+        colCategory.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
+
+        TableColumn<Product, BigDecimal> colCost = new TableColumn<>("Custo");
+        colCost.setCellValueFactory(new PropertyValueFactory<>("costPrice"));
+        colCost.setCellFactory(tc -> moneyCell());
+
+        TableColumn<Product, BigDecimal> colSale = new TableColumn<>("Venda");
+        colSale.setCellValueFactory(new PropertyValueFactory<>("salePrice"));
+        colSale.setCellFactory(tc -> moneyCell());
+
+        TableColumn<Product, Integer> colQty = new TableColumn<>("Qtd");
         colQty.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-        colQty.setPrefWidth(80);
 
-        var colPrice = new TableColumn<Product, BigDecimal>("Preço");
-        colPrice.setCellValueFactory(new PropertyValueFactory<>("price"));
-        colPrice.setPrefWidth(100);
+        TableColumn<Product, Integer> colMin = new TableColumn<>("Mín.");
+        colMin.setCellValueFactory(new PropertyValueFactory<>("minStock"));
 
-        table.getColumns().addAll(colId, colName, colSku, colQty, colPrice);
-        setCenter(table);
+        table.getColumns().setAll(colName, colSku, colCategory, colCost, colSale, colQty, colMin);
 
-        loadData();
+        return table;
+    }
+
+    private TableCell<Product, BigDecimal> moneyCell() {
+        NumberFormat nf = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
+
+        return new TableCell<>() {
+            @Override
+            protected void updateItem(BigDecimal value, boolean empty) {
+                super.updateItem(value, empty);
+                if (empty || value == null) {
+                    setText(null);
+                } else {
+                    setText(nf.format(value));
+                }
+            }
+        };
+    }
+
+    private void loadCategoryFilter() {
+        var list = FXCollections.observableArrayList(categoryDao.findAll());
+        cbCategoryFilter.setItems(list);
     }
 
     private void loadData() {
-        table.setItems(FXCollections.observableArrayList(dao.findAll()));
+        String text = txtSearch.getText();
+        Category cat = cbCategoryFilter.getSelectionModel().getSelectedItem();
+        Long categoryId = (cat != null) ? cat.getId() : null;
+
+        table.setItems(FXCollections.observableArrayList(productDao.search(text, categoryId)));
     }
 
-    private void openProductForm() {
-        try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource("/br/com/matheus/stockcontrol/ui/product_form.fxml")
-            );
-
-            javafx.scene.Parent root = loader.load(); // <-- aqui resolve o cast
-
-            Stage stage = new Stage();
-            stage.setTitle("Novo Produto");
-            stage.initModality(Modality.APPLICATION_MODAL);
-            stage.setScene(new Scene(root));
-            stage.setResizable(false);
-            stage.showAndWait();
-        } catch (IOException e) {
-            throw new RuntimeException("Erro ao abrir formulário de produto", e);
-        }
-    }
-    
     private void onEdit() {
         Product selected = table.getSelectionModel().getSelectedItem();
         if (selected == null) {
@@ -105,7 +154,50 @@ public class ProductsView extends BorderPane {
         openProductFormForEdit(selected);
         loadData();
     }
-    
+
+    private void onDelete() {
+        Product selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showInfo("Selecione um produto para excluir.");
+            return;
+        }
+
+        boolean confirmed = confirm(
+                "Confirmar exclusão",
+                "Excluir o produto: " + selected.getName() + " (SKU: " + selected.getSku() + ")?"
+        );
+
+        if (!confirmed) return;
+
+        int rows = productDao.deleteById(selected.getId());
+        if (rows == 0) {
+            showInfo("Produto não encontrado para excluir (pode já ter sido removido).");
+        }
+
+        loadData();
+    }
+
+    // Reaproveita seu modal existente (NOVO)
+    private void openProductForm() {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/br/com/matheus/stockcontrol/ui/product_form.fxml")
+            );
+
+            Parent root = loader.load();
+
+            Stage stage = new Stage();
+            stage.setTitle("Novo Produto");
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.showAndWait();
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao abrir formulário de produto", e);
+        }
+    }
+
+    // Reaproveita seu modal existente (EDITAR)
     private void openProductFormForEdit(Product product) {
         try {
             FXMLLoader loader = new FXMLLoader(
@@ -114,9 +206,12 @@ public class ProductsView extends BorderPane {
 
             Parent root = loader.load();
 
-            // pega o controller criado pelo FXMLLoader
-            br.com.matheus.stockcontrol.ui.controller.ProductFormController controller = loader.getController();
-            controller.setProductToEdit(product);
+            var controller = loader.getController();
+            // chamamos o método público do controller v2
+            br.com.matheus.stockcontrol.ui.controller.ProductFormController c =
+                    (br.com.matheus.stockcontrol.ui.controller.ProductFormController) controller;
+
+            c.setProductToEdit(product);
 
             Stage stage = new Stage();
             stage.setTitle("Editar Produto");
@@ -127,32 +222,6 @@ public class ProductsView extends BorderPane {
         } catch (Exception e) {
             throw new RuntimeException("Erro ao abrir formulário de edição", e);
         }
-    }
-    
-    private void onDelete() {
-        Product selected = table.getSelectionModel().getSelectedItem();
-        System.out.println("DELETE click - selected=" + selected);
-
-        if (selected == null) {
-            showInfo("Selecione um produto para excluir.");
-            return;
-        }
-
-        System.out.println("Selected id=" + selected.getId());
-
-        boolean confirmed = confirm(
-                "Confirmar exclusão",
-                "Excluir o produto: " + selected.getName() + " (SKU: " + selected.getSku() + ")?"
-        );
-
-        System.out.println("Confirmed=" + confirmed);
-
-        if (!confirmed) return;
-
-  
-        int rows = dao.deleteById(selected.getId());
-        System.out.println("Rows deleted=" + rows);
-        loadData();
     }
 
     private void showInfo(String message) {
@@ -173,5 +242,7 @@ public class ProductsView extends BorderPane {
         return result.isPresent() && result.get() == ButtonType.OK;
     }
     
-        
+    public void refresh() {
+    loadData();
+    }
 }

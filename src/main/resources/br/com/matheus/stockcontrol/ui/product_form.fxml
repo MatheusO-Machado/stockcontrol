@@ -13,28 +13,37 @@
         <Insets top="12" right="12" bottom="12" left="12"/>
     </padding>
 
-    <Label fx:id="lblTitle" text="Novo Produto" style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+    <Label fx:id="lblTitle" text="Novo Produto"
+           style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 
     <GridPane hgap="10" vgap="10">
         <columnConstraints>
-            <ColumnConstraints minWidth="90" />
+            <ColumnConstraints minWidth="110" />
             <ColumnConstraints hgrow="ALWAYS" />
         </columnConstraints>
 
         <Label text="Nome:" GridPane.rowIndex="0" GridPane.columnIndex="0" />
-        <TextField fx:id="txtName" promptText="Ex: Teclado Mecânico"
-                   GridPane.rowIndex="0" GridPane.columnIndex="1" />
+        <TextField fx:id="txtName" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
         <Label text="SKU:" GridPane.rowIndex="1" GridPane.columnIndex="0" />
-        <TextField fx:id="txtSku" promptText="Ex: SKU-100"
-                   GridPane.rowIndex="1" GridPane.columnIndex="1" />
+        <TextField fx:id="txtSku" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
-        <Label text="Quantidade:" GridPane.rowIndex="2" GridPane.columnIndex="0" />
-        <Spinner fx:id="spQuantity" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+        <Label text="Categoria:" GridPane.rowIndex="2" GridPane.columnIndex="0" />
+        <ComboBox fx:id="cbCategory" GridPane.rowIndex="2" GridPane.columnIndex="1" />
 
-        <Label text="Preço:" GridPane.rowIndex="3" GridPane.columnIndex="0" />
-        <TextField fx:id="txtPrice" promptText="Ex: 199.90"
+        <Label text="Preço Custo:" GridPane.rowIndex="3" GridPane.columnIndex="0" />
+        <TextField fx:id="txtCostPrice" promptText="Ex: 10,50"
                    GridPane.rowIndex="3" GridPane.columnIndex="1" />
+
+        <Label text="Preço Venda:" GridPane.rowIndex="4" GridPane.columnIndex="0" />
+        <TextField fx:id="txtSalePrice" promptText="Ex: 19,90"
+                   GridPane.rowIndex="4" GridPane.columnIndex="1" />
+
+        <Label text="Quantidade:" GridPane.rowIndex="5" GridPane.columnIndex="0" />
+        <Spinner fx:id="spQuantity" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+
+        <Label text="Estoque mínimo:" GridPane.rowIndex="6" GridPane.columnIndex="0" />
+        <Spinner fx:id="spMinStock" GridPane.rowIndex="6" GridPane.columnIndex="1" />
     </GridPane>
 
     <HBox spacing="10" alignment="CENTER_RIGHT">
