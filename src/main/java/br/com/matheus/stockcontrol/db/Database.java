@@ -13,7 +13,7 @@ public final class Database {
     private static final String DB_FILE = "stockcontrol.db";
 
     // Controle de versão do schema (SQLite PRAGMA user_version)
-    private static final int SCHEMA_VERSION = 3;
+    private static final int SCHEMA_VERSION = 4;
 
     private Database() {}
 
@@ -64,6 +64,12 @@ public final class Database {
                 migrateV2ToV3(conn);
                 setUserVersion(st, 3);
                 userVersion = 3;
+            }
+
+            if (userVersion < 4) {
+                migrateV3ToV4(conn);
+                setUserVersion(st, 4);
+                userVersion = 4;
             }
 
             if (userVersion > SCHEMA_VERSION) {
@@ -207,6 +213,85 @@ public final class Database {
             """);
 
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_movements_type_datetime ON stock_movements(type, datetime)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_items_movement ON stock_movement_items(movement_id)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_items_product ON stock_movement_items(product_id)");
+
+            st.execute("PRAGMA foreign_keys = ON");
+        }
+    }
+
+    /**
+     * V4:
+     * - Cria tabela parties (clientes/fornecedores)
+     * - Reseta tabelas de movimentação e recria com party_id
+     *
+     * Como o projeto é para portfólio e você optou por descartar dados de movimentações antigas,
+     * essa migração remove stock_movements e stock_movement_items.
+     */
+    private static void migrateV3ToV4(Connection conn) throws Exception {
+        try (Statement st = conn.createStatement()) {
+            st.execute("PRAGMA foreign_keys = OFF");
+
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS parties (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT NOT NULL CHECK (type IN ('CLIENTE', 'FORNECEDOR')),
+                    document_type TEXT NOT NULL CHECK (document_type IN ('CPF', 'CNPJ')),
+                    document TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    phone TEXT,
+                    email TEXT,
+                    zip TEXT,
+                    street TEXT,
+                    number TEXT,
+                    district TEXT,
+                    city TEXT,
+                    state TEXT,
+                    complement TEXT
+                )
+            """);
+
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_parties_type ON parties(type)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_parties_name ON parties(name)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_parties_document ON parties(document)");
+
+            // Reset das tabelas de movimentação (para recomeçar já com party_id)
+            st.executeUpdate("DROP TABLE IF EXISTS stock_movement_items");
+            st.executeUpdate("DROP TABLE IF EXISTS stock_movements");
+
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS stock_movements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT NOT NULL CHECK (type IN ('ENTRADA', 'SAIDA')),
+                    datetime TEXT NOT NULL,
+                    party_id INTEGER NOT NULL,
+                    total_cents INTEGER NOT NULL DEFAULT 0,
+                    observation TEXT,
+                    FOREIGN KEY (party_id) REFERENCES parties(id)
+                        ON UPDATE CASCADE
+                        ON DELETE RESTRICT
+                )
+            """);
+
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS stock_movement_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    movement_id INTEGER NOT NULL,
+                    product_id INTEGER NOT NULL,
+                    quantity INTEGER NOT NULL CHECK (quantity > 0),
+                    unit_cents INTEGER NOT NULL DEFAULT 0,
+                    subtotal_cents INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY (movement_id) REFERENCES stock_movements(id)
+                        ON UPDATE CASCADE
+                        ON DELETE CASCADE,
+                    FOREIGN KEY (product_id) REFERENCES products(id)
+                        ON UPDATE CASCADE
+                        ON DELETE RESTRICT
+                )
+            """);
+
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_movements_type_datetime ON stock_movements(type, datetime)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_movements_party ON stock_movements(party_id)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_items_movement ON stock_movement_items(movement_id)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_items_product ON stock_movement_items(product_id)");
 

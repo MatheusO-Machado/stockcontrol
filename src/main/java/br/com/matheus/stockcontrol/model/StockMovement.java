@@ -12,6 +12,11 @@ public class StockMovement {
     private BigDecimal total;
     private String observation;
 
+    // Pessoa relacionada (cliente/fornecedor)
+    private Long partyId;
+    private String partyName;
+    private String partyDocument;
+
     private List<StockMovementItem> items = new ArrayList<>();
 
     public StockMovement() {}
@@ -38,6 +43,15 @@ public class StockMovement {
 
     public String getObservation() { return observation; }
     public void setObservation(String observation) { this.observation = observation; }
+
+    public Long getPartyId() { return partyId; }
+    public void setPartyId(Long partyId) { this.partyId = partyId; }
+
+    public String getPartyName() { return partyName; }
+    public void setPartyName(String partyName) { this.partyName = partyName; }
+
+    public String getPartyDocument() { return partyDocument; }
+    public void setPartyDocument(String partyDocument) { this.partyDocument = partyDocument; }
 
     public List<StockMovementItem> getItems() { return items; }
     public void setItems(List<StockMovementItem> items) { this.items = items; }

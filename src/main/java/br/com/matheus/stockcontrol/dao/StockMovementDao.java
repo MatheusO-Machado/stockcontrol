@@ -2,8 +2,10 @@ package br.com.matheus.stockcontrol.dao;
 
 import br.com.matheus.stockcontrol.db.Database;
 import br.com.matheus.stockcontrol.model.MovementType;
+import br.com.matheus.stockcontrol.model.PartyType;
 import br.com.matheus.stockcontrol.model.StockMovement;
 import br.com.matheus.stockcontrol.model.StockMovementItem;
+import br.com.matheus.stockcontrol.util.MoneyUtil;
 
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
@@ -16,51 +18,58 @@ public class StockMovementDao {
 
     public List<StockMovement> listMovements(MovementType type, LocalDate start, LocalDate end) {
         StringBuilder sql = new StringBuilder("""
-            SELECT id, type, datetime, total_cents, observation
-            FROM stock_movements
+            SELECT
+              m.id,
+              m.type,
+              m.datetime,
+              m.party_id,
+              p.name AS party_name,
+              p.document AS party_document,
+              m.total_cents,
+              m.observation
+            FROM stock_movements m
+            JOIN parties p ON p.id = m.party_id
             WHERE 1=1
         """);
 
         List<Object> params = new ArrayList<>();
 
         if (type != null) {
-            sql.append(" AND type = ? ");
+            sql.append(" AND m.type = ? ");
             params.add(type.name());
         }
 
-        // período (inclusive)
         if (start != null) {
-            sql.append(" AND datetime >= ? ");
+            sql.append(" AND m.datetime >= ? ");
             params.add(start.atStartOfDay().toString());
         }
         if (end != null) {
-            sql.append(" AND datetime <= ? ");
+            sql.append(" AND m.datetime <= ? ");
             params.add(end.atTime(23, 59, 59).toString());
         }
 
-        sql.append(" ORDER BY datetime DESC LIMIT 500");
+        sql.append(" ORDER BY m.datetime DESC LIMIT 500");
 
         List<StockMovement> list = new ArrayList<>();
 
         try (var conn = Database.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
 
-            for (int i = 0; i < params.size(); i++) {
-                ps.setObject(i + 1, params.get(i));
-            }
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    int totalCents = rs.getInt("total_cents");
-                    BigDecimal total = BigDecimal.valueOf(totalCents).movePointLeft(2);
-
-                    list.add(new StockMovement(
+                    StockMovement m = new StockMovement(
                             rs.getLong("id"),
                             MovementType.valueOf(rs.getString("type")),
                             LocalDateTime.parse(rs.getString("datetime")),
-                            total,
+                            MoneyUtil.fromCents(rs.getInt("total_cents")),
                             rs.getString("observation")
-                    ));
+                    );
+                    m.setPartyId(rs.getLong("party_id"));
+                    m.setPartyName(rs.getString("party_name"));
+                    m.setPartyDocument(rs.getString("party_document"));
+                    list.add(m);
                 }
             }
 
@@ -74,7 +83,6 @@ public class StockMovementDao {
         String sql = """
             SELECT
                 i.id,
-                i.movement_id,
                 i.product_id,
                 p.name AS product_name,
                 p.sku AS product_sku,
@@ -96,8 +104,8 @@ public class StockMovementDao {
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    BigDecimal unit = BigDecimal.valueOf(rs.getInt("unit_cents")).movePointLeft(2);
-                    BigDecimal subtotal = BigDecimal.valueOf(rs.getInt("subtotal_cents")).movePointLeft(2);
+                    BigDecimal unit = MoneyUtil.fromCents(rs.getInt("unit_cents"));
+                    BigDecimal subtotal = MoneyUtil.fromCents(rs.getInt("subtotal_cents"));
 
                     list.add(new StockMovementItem(
                             rs.getLong("id"),
@@ -117,11 +125,12 @@ public class StockMovementDao {
         }
     }
 
-    public void createMovement(MovementType type, List<StockMovementItem> items, String observation) {
+    public void createMovement(MovementType type, long partyId, List<StockMovementItem> items, String observation) {
         if (type == null) throw new IllegalArgumentException("Tipo é obrigatório.");
+        if (partyId <= 0) throw new IllegalArgumentException("Selecione um cliente/fornecedor.");
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Adicione pelo menos um item.");
 
-        // Soma por produto (caso a UI deixe duplicar)
+        // Normaliza itens por produto (soma qty se repetido)
         Map<Long, StockMovementItem> byProduct = new LinkedHashMap<>();
         for (StockMovementItem it : items) {
             if (it.getProductId() == null) throw new IllegalArgumentException("Item sem produto.");
@@ -133,7 +142,6 @@ public class StockMovementDao {
             if (byProduct.containsKey(it.getProductId())) {
                 StockMovementItem acc = byProduct.get(it.getProductId());
                 acc.setQuantity(acc.getQuantity() + it.getQuantity());
-                // mantém unit do último (ou poderia validar igualdade)
                 acc.setUnitPrice(unit);
             } else {
                 StockMovementItem copy = new StockMovementItem();
@@ -146,18 +154,18 @@ public class StockMovementDao {
 
         List<StockMovementItem> normalized = new ArrayList<>(byProduct.values());
 
-        // calcula subtotal e total (sempre, inclusive ENTRADA)
+        // Calcula subtotal e total (ENTRADA e SAIDA têm valor financeiro)
         int totalCents = 0;
         for (StockMovementItem it : normalized) {
-            int unitCents = toCents(it.getUnitPrice());
+            int unitCents = MoneyUtil.toCents(it.getUnitPrice());
             int subtotalCents = Math.multiplyExact(unitCents, it.getQuantity());
-            it.setSubtotal(BigDecimal.valueOf(subtotalCents).movePointLeft(2));
+            it.setSubtotal(MoneyUtil.fromCents(subtotalCents));
             totalCents = Math.addExact(totalCents, subtotalCents);
         }
 
         String insertMove = """
-            INSERT INTO stock_movements (type, datetime, total_cents, observation)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO stock_movements (type, datetime, party_id, total_cents, observation)
+            VALUES (?, ?, ?, ?, ?)
         """;
 
         String insertItem = """
@@ -165,28 +173,20 @@ public class StockMovementDao {
             VALUES (?, ?, ?, ?, ?)
         """;
 
-        // Vamos atualizar estoque por produto:
-        // ENTRADA: +qty
-        // SAIDA: -qty (com validação)
         String selectQty = "SELECT quantity FROM products WHERE id = ?";
         String updateQty = "UPDATE products SET quantity = ? WHERE id = ?";
 
         try (var conn = Database.getConnection()) {
             conn.setAutoCommit(false);
 
-            // valida estoque para SAIDA (considerando soma por produto)
+            // valida party conforme tipo
+            PartyType requiredPartyType = (type == MovementType.SAIDA) ? PartyType.CLIENTE : PartyType.FORNECEDOR;
+            validateParty(conn, partyId, requiredPartyType);
+
+            // valida estoque para SAIDA
             if (type == MovementType.SAIDA) {
                 for (StockMovementItem it : normalized) {
-                    int currentQty;
-
-                    try (PreparedStatement ps = conn.prepareStatement(selectQty)) {
-                        ps.setLong(1, it.getProductId());
-                        try (ResultSet rs = ps.executeQuery()) {
-                            if (!rs.next()) throw new IllegalArgumentException("Produto não encontrado (id=" + it.getProductId() + ")");
-                            currentQty = rs.getInt("quantity");
-                        }
-                    }
-
+                    int currentQty = getCurrentQty(conn, selectQty, it.getProductId());
                     int newQty = currentQty - it.getQuantity();
                     if (newQty < 0) {
                         throw new IllegalArgumentException("Estoque insuficiente para o produto (id=" + it.getProductId() + "). Atual: " + currentQty);
@@ -200,8 +200,9 @@ public class StockMovementDao {
             try (PreparedStatement ps = conn.prepareStatement(insertMove, PreparedStatement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, type.name());
                 ps.setString(2, LocalDateTime.now().toString());
-                ps.setInt(3, totalCents);
-                ps.setString(4, (observation == null || observation.isBlank()) ? null : observation.trim());
+                ps.setLong(3, partyId);
+                ps.setInt(4, totalCents);
+                ps.setString(5, (observation == null || observation.isBlank()) ? null : observation.trim());
                 ps.executeUpdate();
 
                 try (ResultSet keys = ps.getGeneratedKeys()) {
@@ -212,7 +213,7 @@ public class StockMovementDao {
 
             // Insere itens
             for (StockMovementItem it : normalized) {
-                int unitCents = toCents(it.getUnitPrice());
+                int unitCents = MoneyUtil.toCents(it.getUnitPrice());
                 int subtotalCents = Math.multiplyExact(unitCents, it.getQuantity());
 
                 try (PreparedStatement ps = conn.prepareStatement(insertItem)) {
@@ -227,15 +228,7 @@ public class StockMovementDao {
 
             // Atualiza estoque
             for (StockMovementItem it : normalized) {
-                int currentQty;
-
-                try (PreparedStatement ps = conn.prepareStatement(selectQty)) {
-                    ps.setLong(1, it.getProductId());
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (!rs.next()) throw new IllegalArgumentException("Produto não encontrado (id=" + it.getProductId() + ")");
-                        currentQty = rs.getInt("quantity");
-                    }
-                }
+                int currentQty = getCurrentQty(conn, selectQty, it.getProductId());
 
                 int newQty = (type == MovementType.ENTRADA)
                         ? Math.addExact(currentQty, it.getQuantity())
@@ -254,8 +247,27 @@ public class StockMovementDao {
         }
     }
 
-    private int toCents(BigDecimal value) {
-        if (value == null) return 0;
-        return value.movePointRight(2).intValueExact();
+    private void validateParty(java.sql.Connection conn, long partyId, PartyType requiredType) throws Exception {
+        String sql = "SELECT type FROM parties WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, partyId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new IllegalArgumentException("Cliente/Fornecedor não encontrado.");
+                PartyType actual = PartyType.valueOf(rs.getString("type"));
+                if (actual != requiredType) {
+                    throw new IllegalArgumentException("Tipo de pessoa inválido para esta movimentação. Esperado: " + requiredType);
+                }
+            }
+        }
+    }
+
+    private int getCurrentQty(java.sql.Connection conn, String selectQtySql, long productId) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement(selectQtySql)) {
+            ps.setLong(1, productId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new IllegalArgumentException("Produto não encontrado (id=" + productId + ")");
+                return rs.getInt("quantity");
+            }
+        }
     }
 }

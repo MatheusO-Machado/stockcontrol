@@ -96,15 +96,24 @@ public class MovementsView extends BorderPane {
 
         TableColumn<StockMovement, String> colType = new TableColumn<>("Tipo");
         colType.setCellValueFactory(new PropertyValueFactory<>("type"));
+        colType.setMaxWidth(120);
+
+        TableColumn<StockMovement, String> colParty = new TableColumn<>("Pessoa");
+        colParty.setCellValueFactory(new PropertyValueFactory<>("partyName"));
+
+        TableColumn<StockMovement, String> colDoc = new TableColumn<>("Documento");
+        colDoc.setCellValueFactory(new PropertyValueFactory<>("partyDocument"));
+        colDoc.setMaxWidth(180);
 
         TableColumn<StockMovement, BigDecimal> colTotal = new TableColumn<>("Total");
         colTotal.setCellValueFactory(new PropertyValueFactory<>("total"));
         colTotal.setCellFactory(tc -> moneyCell());
+        colTotal.setMaxWidth(140);
 
         TableColumn<StockMovement, String> colObs = new TableColumn<>("Obs.");
         colObs.setCellValueFactory(new PropertyValueFactory<>("observation"));
 
-        table.getColumns().setAll(colId, colDate, colType, colTotal, colObs);
+        table.getColumns().setAll(colId, colDate, colType, colParty, colDoc, colTotal, colObs);
 
         table.setRowFactory(tv -> {
             TableRow<StockMovement> row = new TableRow<>();
@@ -141,7 +150,9 @@ public class MovementsView extends BorderPane {
         var items = dao.listItemsByMovementId(m.getId());
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Movimentação #").append(m.getId()).append(" - ").append(m.getType()).append("\n\n");
+        sb.append("Movimentação #").append(m.getId()).append(" - ").append(m.getType()).append("\n");
+        sb.append("Pessoa: ").append(m.getPartyName()).append(" - ").append(m.getPartyDocument()).append("\n\n");
+
         for (StockMovementItem it : items) {
             sb.append("- ")
               .append(it.getProductName()).append(" (").append(it.getProductSku()).append(")")

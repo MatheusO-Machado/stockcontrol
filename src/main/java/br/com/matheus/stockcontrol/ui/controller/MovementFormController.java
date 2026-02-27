@@ -1,16 +1,26 @@
 package br.com.matheus.stockcontrol.ui.controller;
 
+import br.com.matheus.stockcontrol.dao.PartyDao;
 import br.com.matheus.stockcontrol.dao.ProductDao;
 import br.com.matheus.stockcontrol.dao.StockMovementDao;
 import br.com.matheus.stockcontrol.model.MovementType;
+import br.com.matheus.stockcontrol.model.Party;
+import br.com.matheus.stockcontrol.model.PartyType;
 import br.com.matheus.stockcontrol.model.Product;
 import br.com.matheus.stockcontrol.model.StockMovementItem;
+import javafx.animation.PauseTransition;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
+import javafx.util.StringConverter;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
@@ -19,6 +29,9 @@ import java.util.Locale;
 public class MovementFormController {
 
     @FXML private ComboBox<MovementType> cbType;
+    @FXML private Label lblParty;
+    @FXML private ComboBox<Party> cbParty;
+    @FXML private Button btnNewParty;
     @FXML private TextField txtObservation;
 
     @FXML private ComboBox<Product> cbProduct;
@@ -31,21 +44,26 @@ public class MovementFormController {
     @FXML private Button btnSave;
 
     private final ProductDao productDao = new ProductDao();
+    private final PartyDao partyDao = new PartyDao();
     private final StockMovementDao movementDao = new StockMovementDao();
 
     private final ObservableList<StockMovementItem> items = FXCollections.observableArrayList();
 
     private boolean saved = false;
-
     public boolean isSaved() { return saved; }
+
+    private final PauseTransition partySearchDebounce = new PauseTransition(Duration.millis(250));
 
     @FXML
     private void initialize() {
         cbType.getItems().setAll(MovementType.values());
         cbType.getSelectionModel().select(MovementType.ENTRADA);
 
-        cbProduct.getItems().setAll(productDao.findAll());
+        cbParty.setEditable(true);
+        cbParty.setPromptText("Digite nome ou CPF/CNPJ...");
+        configurePartyAutocomplete();
 
+        cbProduct.getItems().setAll(productDao.findAll());
         cbProduct.setCellFactory(listView -> new ListCell<>() {
             @Override protected void updateItem(Product item, boolean empty) {
                 super.updateItem(item, empty);
@@ -64,26 +82,85 @@ public class MovementFormController {
         buildItemsTable();
         tableItems.setItems(items);
 
-        // comportamento do valor unitário conforme tipo
         cbType.valueProperty().addListener((obs, old, type) -> {
             onTypeChanged(type);
+            fillSuggestedUnitPrice();
             updateTotal();
+            refreshPartyForType();
         });
+
         cbProduct.valueProperty().addListener((obs, old, p) -> fillSuggestedUnitPrice());
+
         onTypeChanged(cbType.getValue());
         fillSuggestedUnitPrice();
+        refreshPartyForType();
 
         btnAddItem.setOnAction(e -> onAddItem());
+        btnNewParty.setOnAction(e -> onNewParty());
+
         updateTotal();
         updateSaveButtonState();
     }
 
-    private void onTypeChanged(MovementType type) {
-        boolean needsUnit = (type == MovementType.ENTRADA || type == MovementType.SAIDA);
-        txtUnitPrice.setDisable(!needsUnit);
+    private void configurePartyAutocomplete() {
+        cbParty.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Party p) {
+                if (p == null) return "";
+                return p.getName() + " - " + p.getDocument();
+            }
 
-        // limpa sugestão e recalcula
-        fillSuggestedUnitPrice();
+            @Override
+            public Party fromString(String s) {
+                // Não converte texto livre em Party.
+                // O usuário precisa selecionar um item da lista.
+                return null;
+            }
+        });
+
+        cbParty.getEditor().textProperty().addListener((obs, old, val) -> {
+            partySearchDebounce.stop();
+            partySearchDebounce.setOnFinished(e -> searchParties(val));
+            partySearchDebounce.playFromStart();
+        });
+
+        cbParty.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(Party item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getName() + " - " + item.getDocument());
+            }
+        });
+
+        cbParty.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(Party item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getName() + " - " + item.getDocument());
+            }
+        });
+    }
+
+    private void refreshPartyForType() {
+        cbParty.getItems().clear();
+        cbParty.setValue(null);
+        cbParty.getEditor().clear();
+
+        PartyType partyType = requiredPartyType();
+        cbParty.getItems().setAll(partyDao.search(partyType, "", 30));
+    }
+
+    private void searchParties(String term) {
+        PartyType partyType = requiredPartyType();
+        var results = partyDao.search(partyType, term, 30);
+        cbParty.getItems().setAll(results);
+        if (!results.isEmpty()) cbParty.show();
+    }
+
+    private PartyType requiredPartyType() {
+        return cbType.getValue() == MovementType.SAIDA ? PartyType.CLIENTE : PartyType.FORNECEDOR;
+    }
+
+    private void onTypeChanged(MovementType type) {
+        lblParty.setText(type == MovementType.SAIDA ? "Cliente:" : "Fornecedor:");
     }
 
     private void fillSuggestedUnitPrice() {
@@ -159,7 +236,6 @@ public class MovementFormController {
             BigDecimal unit = parseMoney(txtUnitPrice.getText());
             if (unit.signum() < 0) throw new IllegalArgumentException("Valor unitário não pode ser negativo.");
 
-            // Se já existe item do produto, soma quantidade e atualiza unit
             StockMovementItem existing = items.stream()
                     .filter(i -> i.getProductId().equals(product.getId()))
                     .findFirst()
@@ -184,9 +260,72 @@ public class MovementFormController {
             updateTotal();
             updateSaveButtonState();
 
-            // reset qty para facilitar
             spQuantity.getValueFactory().setValue(1);
             cbProduct.requestFocus();
+        } catch (IllegalArgumentException e) {
+            showError("Validação", e.getMessage());
+        } catch (Exception e) {
+            showError("Erro", e.getMessage() != null ? e.getMessage() : e.toString());
+        }
+    }
+
+    private void onNewParty() {
+        try {
+            PartyType partyType = requiredPartyType();
+
+            var url = getClass().getResource("/br/com/matheus/stockcontrol/ui/party_form.fxml");
+            if (url == null) throw new IllegalStateException("FXML não encontrado: /br/com/matheus/stockcontrol/ui/party_form.fxml");
+
+            FXMLLoader loader = new FXMLLoader(url);
+            Parent root = loader.load();
+
+            PartyFormController controller = loader.getController();
+            controller.prefillType(partyType);
+
+            Stage stage = new Stage();
+            stage.setTitle(partyType == PartyType.CLIENTE ? "Novo Cliente" : "Novo Fornecedor");
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.showAndWait();
+
+            if (controller.isSaved()) {
+                refreshPartyForType();
+                cbParty.requestFocus();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            showError("Erro", e.getMessage() != null ? e.getMessage() : e.toString());
+        }
+    }
+
+    @FXML
+    private void onCancel() {
+        saved = false;
+        closeWindow();
+    }
+
+    @FXML
+    private void onSave() {
+        try {
+            MovementType type = cbType.getValue();
+            if (type == null) throw new IllegalArgumentException("Selecione o tipo.");
+
+            // IMPORTANTE: para ComboBox editável, use getValue()
+            Party party = cbParty.getValue();
+            if (party == null || party.getId() == null) {
+                throw new IllegalArgumentException("Selecione um " + (type == MovementType.SAIDA ? "cliente" : "fornecedor") + " na lista.");
+            }
+
+            for (StockMovementItem it : items) {
+                BigDecimal unit = it.getUnitPrice() == null ? BigDecimal.ZERO : it.getUnitPrice();
+                it.setSubtotal(unit.multiply(BigDecimal.valueOf(it.getQuantity())));
+            }
+
+            movementDao.createMovement(type, party.getId(), items, txtObservation.getText());
+
+            saved = true;
+            closeWindow();
         } catch (IllegalArgumentException e) {
             showError("Validação", e.getMessage());
         } catch (Exception e) {
@@ -209,40 +348,10 @@ public class MovementFormController {
         btnSave.setDisable(items.isEmpty());
     }
 
-    @FXML
-    private void onCancel() {
-        saved = false;
-        closeWindow();
-    }
-
-    @FXML
-    private void onSave() {
-        try {
-            MovementType type = cbType.getValue();
-            if (type == null) throw new IllegalArgumentException("Selecione o tipo.");
-
-            // garante subtotal consistente
-            for (StockMovementItem it : items) {
-                BigDecimal unit = it.getUnitPrice() == null ? BigDecimal.ZERO : it.getUnitPrice();
-                it.setSubtotal(unit.multiply(BigDecimal.valueOf(it.getQuantity())));
-            }
-
-            movementDao.createMovement(type, items, txtObservation.getText());
-
-            saved = true;
-            closeWindow();
-        } catch (IllegalArgumentException e) {
-            showError("Validação", e.getMessage());
-        } catch (Exception e) {
-            showError("Erro", e.getMessage() != null ? e.getMessage() : e.toString());
-        }
-    }
-
     private BigDecimal parseMoney(String text) {
         if (text == null) return BigDecimal.ZERO;
         String s = text.trim();
         if (s.isEmpty()) return BigDecimal.ZERO;
-
         s = s.replace(",", ".");
         return new BigDecimal(s);
     }

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="br.com.matheus.stockcontrol.ui.controller.PartyFormController"
+      spacing="10">
+
+    <padding>
+        <Insets top="12" right="12" bottom="12" left="12"/>
+    </padding>
+
+    <Label text="Cadastro de Pessoa"
+           style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+
+    <TabPane tabClosingPolicy="UNAVAILABLE">
+        <tabs>
+            <Tab text="Dados">
+                <content>
+                    <GridPane hgap="10" vgap="10">
+                        <padding>
+                            <Insets top="10" right="10" bottom="10" left="10"/>
+                        </padding>
+
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="140"/>
+                            <ColumnConstraints hgrow="ALWAYS"/>
+                        </columnConstraints>
+
+                        <Label text="Tipo:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                        <ComboBox fx:id="cbType" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                        <Label text="Nome:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtName" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                        <Label text="Tipo doc.:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                        <ComboBox fx:id="cbDocumentType" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+                        <Label text="CPF/CNPJ:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtDocument" promptText="Somente números ou formatado"
+                                   GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+                        <Label text="Telefone:" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtPhone" promptText="(xx) xxxxx-xxxx"
+                                   GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+
+                        <Label text="E-mail:" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtEmail" promptText="opcional"
+                                   GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+                    </GridPane>
+                </content>
+            </Tab>
+
+            <Tab text="Endereço">
+                <content>
+                    <GridPane hgap="10" vgap="10">
+                        <padding>
+                            <Insets top="10" right="10" bottom="10" left="10"/>
+                        </padding>
+
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="140"/>
+                            <ColumnConstraints hgrow="ALWAYS"/>
+                        </columnConstraints>
+
+                        <Label text="CEP:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtZip" promptText="00000-000"
+                                   GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                        <Label text="Rua:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtStreet"
+                                   GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                        <Label text="Número:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtNumber"
+                                   GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+                        <Label text="Bairro:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtDistrict"
+                                   GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+                        <Label text="Cidade:" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtCity"
+                                   GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+
+                        <Label text="UF:" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtState" promptText="SP"
+                                   GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+
+                        <Label text="Complemento:" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+                        <TextField fx:id="txtComplement" promptText="opcional"
+                                   GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+                    </GridPane>
+                </content>
+            </Tab>
+        </tabs>
+    </TabPane>
+
+    <HBox spacing="10" alignment="CENTER_RIGHT">
+        <Button text="Cancelar" onAction="#onCancel"/>
+        <Button text="Salvar" defaultButton="true" onAction="#onSave"/>
+    </HBox>
+</VBox>

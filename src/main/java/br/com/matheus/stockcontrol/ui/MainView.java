@@ -12,11 +12,13 @@ public class MainView extends BorderPane {
 
     private final Button btnProducts = new Button("Produtos");
     private final Button btnMovements = new Button("Movimentações");
+    private final Button btnParties = new Button("Pessoas");
     private final Button btnDashboard = new Button("Dashboard");
 
     // Mantém instâncias para poder dar refresh sem recriar tudo
     private final ProductsView productsView = new ProductsView();
     private final MovementsView movementsView = new MovementsView(productsView::refresh);
+    private final PartiesView partiesView = new PartiesView();
 
     public MainView() {
         setPadding(new Insets(10));
@@ -33,9 +35,10 @@ public class MainView extends BorderPane {
         // Left: menu
         btnProducts.setMaxWidth(Double.MAX_VALUE);
         btnMovements.setMaxWidth(Double.MAX_VALUE);
+        btnParties.setMaxWidth(Double.MAX_VALUE);
         btnDashboard.setMaxWidth(Double.MAX_VALUE);
 
-        var leftMenu = new VBox(8, btnProducts, btnMovements, btnDashboard);
+        var leftMenu = new VBox(8, btnProducts, btnMovements, btnParties, btnDashboard);
         leftMenu.setPadding(new Insets(10, 10, 10, 0));
         leftMenu.setPrefWidth(160);
         setLeft(leftMenu);
@@ -46,6 +49,7 @@ public class MainView extends BorderPane {
         // Navegação
         btnProducts.setOnAction(e -> showProducts());
         btnMovements.setOnAction(e -> showMovements());
+        btnParties.setOnAction(e -> showParties());
         btnDashboard.setOnAction(e -> showDashboard());
     }
 
@@ -57,6 +61,11 @@ public class MainView extends BorderPane {
     private void showMovements() {
         setCenter(movementsView);
         lblTitle.setText("Movimentações");
+    }
+
+    private void showParties() {
+        setCenter(partiesView);
+        lblTitle.setText("Pessoas");
     }
 
     private void showDashboard() {

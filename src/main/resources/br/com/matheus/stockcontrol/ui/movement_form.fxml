@@ -26,8 +26,14 @@
         <Label text="Tipo:" GridPane.rowIndex="0" GridPane.columnIndex="0" />
         <ComboBox fx:id="cbType" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
-        <Label text="Observação:" GridPane.rowIndex="1" GridPane.columnIndex="0" />
-        <TextField fx:id="txtObservation" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+        <Label fx:id="lblParty" text="Pessoa:" GridPane.rowIndex="1" GridPane.columnIndex="0" />
+        <HBox spacing="8" GridPane.rowIndex="1" GridPane.columnIndex="1">
+            <ComboBox fx:id="cbParty" prefWidth="380" />
+            <Button fx:id="btnNewParty" text="Novo" />
+        </HBox>
+
+        <Label text="Observação:" GridPane.rowIndex="2" GridPane.columnIndex="0" />
+        <TextField fx:id="txtObservation" GridPane.rowIndex="2" GridPane.columnIndex="1" />
     </GridPane>
 
     <Separator/>
