@@ -16,6 +16,8 @@ public class Product {
     private int quantity;
     private int minStock;           // estoqueMinimo
 
+    private boolean active = true;
+
     public Product() {}
 
     public Product(
@@ -38,6 +40,32 @@ public class Product {
         this.salePrice = salePrice;
         this.quantity = quantity;
         this.minStock = minStock;
+        this.active = true;
+    }
+
+    // Construtor com active (usado pelo DAO)
+    public Product(
+            Long id,
+            String name,
+            String sku,
+            Long categoryId,
+            String categoryName,
+            BigDecimal costPrice,
+            BigDecimal salePrice,
+            int quantity,
+            int minStock,
+            boolean active
+    ) {
+        this.id = id;
+        this.name = name;
+        this.sku = sku;
+        this.categoryId = categoryId;
+        this.categoryName = categoryName;
+        this.costPrice = costPrice;
+        this.salePrice = salePrice;
+        this.quantity = quantity;
+        this.minStock = minStock;
+        this.active = active;
     }
 
     public Long getId() { return id; }
@@ -66,4 +94,14 @@ public class Product {
 
     public int getMinStock() { return minStock; }
     public void setMinStock(int minStock) { this.minStock = minStock; }
+
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
+
+    @Override
+    public String toString() {
+        String n = name == null ? "" : name;
+        String s = sku == null ? "" : sku;
+        return n + " (" + s + ")";
+    }
 }

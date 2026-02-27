@@ -32,7 +32,7 @@
         <ComboBox fx:id="cbCategory" GridPane.rowIndex="2" GridPane.columnIndex="1" />
 
         <Label text="Preço Custo:" GridPane.rowIndex="3" GridPane.columnIndex="0" />
-        <TextField fx:id="txtCostPrice" promptText="Ex: 10,50"
+        <TextField fx:id="txtCostPrice" promptText="Controlado por entradas (custo médio)"
                    GridPane.rowIndex="3" GridPane.columnIndex="1" />
 
         <Label text="Preço Venda:" GridPane.rowIndex="4" GridPane.columnIndex="0" />
@@ -44,6 +44,11 @@
 
         <Label text="Estoque mínimo:" GridPane.rowIndex="6" GridPane.columnIndex="0" />
         <Spinner fx:id="spMinStock" GridPane.rowIndex="6" GridPane.columnIndex="1" />
+
+        <!-- NOVO -->
+        <Label text="Status:" GridPane.rowIndex="7" GridPane.columnIndex="0" />
+        <CheckBox fx:id="chkActive" text="Produto ativo" selected="true"
+                  GridPane.rowIndex="7" GridPane.columnIndex="1" />
     </GridPane>
 
     <HBox spacing="10" alignment="CENTER_RIGHT">

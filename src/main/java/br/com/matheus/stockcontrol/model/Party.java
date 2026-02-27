@@ -20,6 +20,8 @@ public class Party {
     private String state;
     private String complement;
 
+    private boolean active = true;
+
     public Party() {}
 
     public Party(Long id, PartyType type, DocumentType documentType, String document, String name) {
@@ -71,6 +73,9 @@ public class Party {
 
     public String getComplement() { return complement; }
     public void setComplement(String complement) { this.complement = complement; }
+
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
 
     @Override
     public String toString() {

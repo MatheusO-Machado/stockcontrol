@@ -18,6 +18,8 @@ public class PartyFormController {
     @FXML private TextField txtPhone;
     @FXML private TextField txtEmail;
 
+    @FXML private CheckBox chkActive;
+
     @FXML private TextField txtZip;
     @FXML private TextField txtStreet;
     @FXML private TextField txtNumber;
@@ -28,7 +30,7 @@ public class PartyFormController {
 
     private final PartyDao dao = new PartyDao();
 
-    private Party editing;              // se não for null => editando
+    private Party editing;               // se não for null => editando
     private PartyType forcedType = null; // usado quando abre pelo botão "Novo" em Movimentações
     private boolean saved = false;
 
@@ -73,6 +75,8 @@ public class PartyFormController {
         cbDocumentType.getItems().setAll(DocumentType.values());
         cbDocumentType.getSelectionModel().select(DocumentType.CPF);
 
+        if (chkActive != null) chkActive.setSelected(true);
+
         // Ajuste de UX: se mudar tipo doc, limpa documento para evitar confusão
         cbDocumentType.valueProperty().addListener((obs, old, val) -> {
             if (old != null && val != null && old != val) {
@@ -94,6 +98,8 @@ public class PartyFormController {
         txtDocument.setText(p.getDocument());
         txtPhone.setText(p.getPhone());
         txtEmail.setText(p.getEmail());
+
+        if (chkActive != null) chkActive.setSelected(p.isActive());
 
         txtZip.setText(p.getZip());
         txtStreet.setText(p.getStreet());
@@ -146,6 +152,9 @@ public class PartyFormController {
             p.setState(uf);
 
             p.setComplement(safe(txtComplement.getText()));
+
+            boolean active = chkActive == null || chkActive.isSelected();
+            p.setActive(active);
 
             if (editing == null) {
                 long id = dao.insert(p);

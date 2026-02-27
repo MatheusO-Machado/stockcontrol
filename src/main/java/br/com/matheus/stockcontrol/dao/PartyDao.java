@@ -15,17 +15,26 @@ import static br.com.matheus.stockcontrol.util.BrDocumentValidator.onlyDigits;
 public class PartyDao {
 
     public List<Party> search(PartyType type, String term, int limit) {
+        return search(type, term, limit, false);
+    }
+
+    public List<Party> search(PartyType type, String term, int limit, boolean includeInactive) {
         String t = term == null ? "" : term.trim();
         String digits = onlyDigits(t);
 
         StringBuilder sql = new StringBuilder("""
             SELECT id, type, document_type, document, name, phone, email,
-                   zip, street, number, district, city, state, complement
+                   zip, street, number, district, city, state, complement,
+                   active
             FROM parties
             WHERE 1=1
         """);
 
         List<Object> params = new ArrayList<>();
+
+        if (!includeInactive) {
+            sql.append(" AND active = 1 ");
+        }
 
         if (type != null) {
             sql.append(" AND type = ? ");
@@ -60,7 +69,8 @@ public class PartyDao {
     public Party findById(long id) {
         String sql = """
             SELECT id, type, document_type, document, name, phone, email,
-                   zip, street, number, district, city, state, complement
+                   zip, street, number, district, city, state, complement,
+                   active
             FROM parties
             WHERE id = ?
         """;
@@ -82,8 +92,9 @@ public class PartyDao {
         String sql = """
             INSERT INTO parties
             (type, document_type, document, name, phone, email,
-             zip, street, number, district, city, state, complement)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             zip, street, number, district, city, state, complement,
+             active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """;
 
         try (var conn = Database.getConnection();
@@ -116,7 +127,8 @@ public class PartyDao {
               district = ?,
               city = ?,
               state = ?,
-              complement = ?
+              complement = ?,
+              active = ?
             WHERE id = ?
         """;
 
@@ -124,10 +136,24 @@ public class PartyDao {
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             bind(ps, p);
-            ps.setLong(14, p.getId());
+            ps.setLong(15, p.getId());
             ps.executeUpdate();
         } catch (Exception e) {
             throw new RuntimeException("Erro ao atualizar pessoa", e);
+        }
+    }
+
+    public void setActive(long id, boolean active) {
+        String sql = "UPDATE parties SET active = ? WHERE id = ?";
+
+        try (var conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, active ? 1 : 0);
+            ps.setLong(2, id);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao alterar status (ativo/inativo)", e);
         }
     }
 
@@ -139,6 +165,15 @@ public class PartyDao {
 
             ps.setLong(1, id);
             ps.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("foreign key")) {
+                throw new IllegalArgumentException(
+                        "Não é possível excluir esta pessoa porque ela possui movimentações. " +
+                        "Use a opção Inativar."
+                );
+            }
+            throw new RuntimeException("Erro ao excluir pessoa: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao excluir pessoa", e);
         }
@@ -160,6 +195,7 @@ public class PartyDao {
         p.setCity(rs.getString("city"));
         p.setState(rs.getString("state"));
         p.setComplement(rs.getString("complement"));
+        p.setActive(rs.getInt("active") == 1);
         return p;
     }
 
@@ -177,6 +213,7 @@ public class PartyDao {
         ps.setString(11, emptyToNull(p.getCity()));
         ps.setString(12, emptyToNull(p.getState()));
         ps.setString(13, emptyToNull(p.getComplement()));
+        ps.setInt(14, p.isActive() ? 1 : 0);
     }
 
     private String emptyToNull(String s) {

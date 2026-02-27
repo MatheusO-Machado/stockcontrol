@@ -11,7 +11,34 @@ import java.util.List;
 
 public class ProductDao {
 
+    public String getNextSku() {
+        String sql = """
+            SELECT MAX(CAST(substr(sku, 5) AS INTEGER)) AS max_num
+            FROM products
+            WHERE sku LIKE 'SKU-%'
+        """;
+
+        try (var conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            int next = 1;
+            if (rs.next()) {
+                int max = rs.getInt("max_num");
+                if (!rs.wasNull()) next = max + 1;
+            }
+
+            return String.format("SKU-%03d", next);
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao gerar próximo SKU", e);
+        }
+    }
+
     public List<Product> findAll() {
+        return findAll(false);
+    }
+
+    public List<Product> findAll(boolean includeInactive) {
         String sql = """
             SELECT
                 p.id,
@@ -22,16 +49,35 @@ public class ProductDao {
                 p.cost_cents,
                 p.sale_cents,
                 p.quantity,
-                p.min_stock
+                p.min_stock,
+                p.active
             FROM products p
             JOIN categories c ON c.id = p.category_id
+            WHERE (? = 1 OR p.active = 1)
             ORDER BY p.name
         """;
 
-        return queryList(sql, null);
+        List<Product> list = new ArrayList<>();
+
+        try (var conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, includeInactive ? 1 : 0);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) list.add(map(rs));
+            }
+            return list;
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao listar produtos", e);
+        }
     }
 
     public List<Product> search(String text, Long categoryId) {
+        return search(text, categoryId, false);
+    }
+
+    public List<Product> search(String text, Long categoryId, boolean includeInactive) {
         String baseSql = """
             SELECT
                 p.id,
@@ -42,19 +88,31 @@ public class ProductDao {
                 p.cost_cents,
                 p.sale_cents,
                 p.quantity,
-                p.min_stock
+                p.min_stock,
+                p.active
             FROM products p
             JOIN categories c ON c.id = p.category_id
+            WHERE 1=1
         """;
 
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        boolean hasText = text != null && !text.isBlank();
+        StringBuilder where = new StringBuilder();
+        List<Object> params = new ArrayList<>();
 
+        if (!includeInactive) {
+            where.append(" AND p.active = 1 ");
+        }
+
+        boolean hasText = text != null && !text.isBlank();
         if (hasText) {
             where.append(" AND (p.name LIKE ? OR p.sku LIKE ?) ");
+            String like = "%" + text.trim() + "%";
+            params.add(like);
+            params.add(like);
         }
+
         if (categoryId != null) {
             where.append(" AND p.category_id = ? ");
+            params.add(categoryId);
         }
 
         String sql = baseSql + where + " ORDER BY p.name";
@@ -64,41 +122,12 @@ public class ProductDao {
         try (var conn = Database.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            int idx = 1;
-
-            if (hasText) {
-                String like = "%" + text.trim() + "%";
-                ps.setString(idx++, like);
-                ps.setString(idx++, like);
-            }
-            if (categoryId != null) {
-                ps.setLong(idx++, categoryId);
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
             }
 
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    long id = rs.getLong("id");
-                    String name = rs.getString("name");
-                    String sku = rs.getString("sku");
-
-                    long catId = rs.getLong("category_id");
-                    String catName = rs.getString("category_name");
-
-                    int costCents = rs.getInt("cost_cents");
-                    int saleCents = rs.getInt("sale_cents");
-                    int quantity = rs.getInt("quantity");
-                    int minStock = rs.getInt("min_stock");
-
-                    BigDecimal costPrice = BigDecimal.valueOf(costCents).movePointLeft(2);
-                    BigDecimal salePrice = BigDecimal.valueOf(saleCents).movePointLeft(2);
-
-                    list.add(new Product(
-                            id, name, sku,
-                            catId, catName,
-                            costPrice, salePrice,
-                            quantity, minStock
-                    ));
-                }
+                while (rs.next()) list.add(map(rs));
             }
 
             return list;
@@ -107,83 +136,10 @@ public class ProductDao {
         }
     }
 
-    private List<Product> queryList(String sql, Object params) {
-        List<Product> list = new ArrayList<>();
-
-        try (var conn = Database.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            if (params == null) {
-                // nada
-            } else if (params instanceof ParamsSearch p) {
-                // (não usado)
-            } else if (params.getClass().getSimpleName().equals("Params")) {
-                // hack simples para manter compatível com Java sem expor record fora
-                // vamos setar por reflexão? não. Então: vamos usar método próprio.
-            }
-
-            // Para evitar complicação, vamos detectar e setar manualmente se for search:
-            if (params != null) {
-                // params é record local Params(text, categoryId)
-                var text = (String) params.getClass().getMethod("text").invoke(params);
-                var categoryId = (Long) params.getClass().getMethod("categoryId").invoke(params);
-
-                String like = (text == null || text.isBlank()) ? null : ("%" + text.trim() + "%");
-
-                // ( ? IS NULL OR ? = '' OR p.name LIKE ? OR p.sku LIKE ? )
-                ps.setString(1, text);
-                ps.setString(2, text);
-                ps.setString(3, like);
-                ps.setString(4, like);
-
-                // ( ? IS NULL OR p.category_id = ? )
-                if (categoryId == null) {
-                    ps.setObject(5, null);
-                    ps.setObject(6, null);
-                } else {
-                    ps.setLong(5, categoryId);
-                    ps.setLong(6, categoryId);
-                }
-            }
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    long id = rs.getLong("id");
-                    String name = rs.getString("name");
-                    String sku = rs.getString("sku");
-
-                    long catId = rs.getLong("category_id");
-                    String catName = rs.getString("category_name");
-
-                    int costCents = rs.getInt("cost_cents");
-                    int saleCents = rs.getInt("sale_cents");
-
-                    int quantity = rs.getInt("quantity");
-                    int minStock = rs.getInt("min_stock");
-
-                    BigDecimal costPrice = BigDecimal.valueOf(costCents).movePointLeft(2);
-                    BigDecimal salePrice = BigDecimal.valueOf(saleCents).movePointLeft(2);
-
-                    list.add(new Product(
-                            id, name, sku,
-                            catId, catName,
-                            costPrice, salePrice,
-                            quantity, minStock
-                    ));
-                }
-            }
-
-            return list;
-        } catch (Exception e) {
-            throw new RuntimeException("Erro ao buscar produtos", e);
-        }
-    }
-
-    // Insert V2
     public void insert(Product p) {
         String sql = """
-            INSERT INTO products (name, sku, category_id, cost_cents, sale_cents, quantity, min_stock)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (name, sku, category_id, cost_cents, sale_cents, quantity, min_stock, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """;
 
         int costCents = toCents(p.getCostPrice());
@@ -199,6 +155,7 @@ public class ProductDao {
             ps.setInt(5, saleCents);
             ps.setInt(6, p.getQuantity());
             ps.setInt(7, p.getMinStock());
+            ps.setInt(8, p.isActive() ? 1 : 0);
 
             ps.executeUpdate();
         } catch (java.sql.SQLException e) {
@@ -215,7 +172,7 @@ public class ProductDao {
     public void update(Product p) {
         String sql = """
             UPDATE products
-            SET name = ?, category_id = ?, cost_cents = ?, sale_cents = ?, quantity = ?, min_stock = ?
+            SET name = ?, category_id = ?, cost_cents = ?, sale_cents = ?, quantity = ?, min_stock = ?, active = ?
             WHERE id = ?
         """;
 
@@ -231,7 +188,8 @@ public class ProductDao {
             ps.setInt(4, saleCents);
             ps.setInt(5, p.getQuantity());
             ps.setInt(6, p.getMinStock());
-            ps.setLong(7, p.getId());
+            ps.setInt(7, p.isActive() ? 1 : 0);
+            ps.setLong(8, p.getId());
 
             int rows = ps.executeUpdate();
             if (rows == 0) {
@@ -239,6 +197,20 @@ public class ProductDao {
             }
         } catch (Exception e) {
             throw new RuntimeException("Erro ao atualizar produto", e);
+        }
+    }
+
+    public void setActive(long id, boolean active) {
+        String sql = "UPDATE products SET active = ? WHERE id = ?";
+
+        try (var conn = Database.getConnection();
+             var ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, active ? 1 : 0);
+            ps.setLong(2, id);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao alterar status (ativo/inativo) do produto", e);
         }
     }
 
@@ -250,16 +222,49 @@ public class ProductDao {
 
             ps.setLong(1, id);
             return ps.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("foreign key")) {
+                throw new IllegalArgumentException(
+                        "Não é possível excluir este produto porque ele possui movimentações. Use a opção Inativar."
+                );
+            }
+            throw new RuntimeException("Erro ao excluir produto: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao excluir produto", e);
         }
+    }
+
+    private Product map(ResultSet rs) throws Exception {
+        long id = rs.getLong("id");
+        String name = rs.getString("name");
+        String sku = rs.getString("sku");
+
+        long catId = rs.getLong("category_id");
+        String catName = rs.getString("category_name");
+
+        int costCents = rs.getInt("cost_cents");
+        int saleCents = rs.getInt("sale_cents");
+
+        int quantity = rs.getInt("quantity");
+        int minStock = rs.getInt("min_stock");
+
+        boolean active = rs.getInt("active") == 1;
+
+        BigDecimal costPrice = BigDecimal.valueOf(costCents).movePointLeft(2);
+        BigDecimal salePrice = BigDecimal.valueOf(saleCents).movePointLeft(2);
+
+        return new Product(
+                id, name, sku,
+                catId, catName,
+                costPrice, salePrice,
+                quantity, minStock,
+                active
+        );
     }
 
     private int toCents(BigDecimal value) {
         if (value == null) return 0;
         return value.movePointRight(2).intValueExact();
     }
-
-    // Apenas para evitar warning do compilador por causa do record local acima
-    private interface ParamsSearch {}
 }

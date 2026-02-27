@@ -24,7 +24,12 @@ import javafx.util.StringConverter;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.util.List;
 import java.util.Locale;
+
+import javafx.application.Platform;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 
 public class MovementFormController {
 
@@ -33,6 +38,8 @@ public class MovementFormController {
     @FXML private ComboBox<Party> cbParty;
     @FXML private Button btnNewParty;
     @FXML private TextField txtObservation;
+
+    @FXML private TextField txtProductSearch;
 
     @FXML private ComboBox<Product> cbProduct;
     @FXML private Spinner<Integer> spQuantity;
@@ -48,11 +55,13 @@ public class MovementFormController {
     private final StockMovementDao movementDao = new StockMovementDao();
 
     private final ObservableList<StockMovementItem> items = FXCollections.observableArrayList();
+    private List<Product> allProducts = List.of();
 
     private boolean saved = false;
     public boolean isSaved() { return saved; }
 
     private final PauseTransition partySearchDebounce = new PauseTransition(Duration.millis(250));
+    private final PauseTransition productSearchDebounce = new PauseTransition(Duration.millis(150));
 
     @FXML
     private void initialize() {
@@ -63,21 +72,29 @@ public class MovementFormController {
         cbParty.setPromptText("Digite nome ou CPF/CNPJ...");
         configurePartyAutocomplete();
 
-        cbProduct.getItems().setAll(productDao.findAll());
-        cbProduct.setCellFactory(listView -> new ListCell<>() {
-            @Override protected void updateItem(Product item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.getName() + " (" + item.getSku() + ")");
-            }
-        });
-        cbProduct.setButtonCell(new ListCell<>() {
-            @Override protected void updateItem(Product item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.getName() + " (" + item.getSku() + ")");
+        // Produtos: carrega tudo e prepara filtro por busca
+        allProducts = productDao.findAll();
+        configureProductCombo();
+        configureProductSearch();
+
+        // Quantidade: digitável (inteiro) e commita ao pressionar Enter
+        spQuantity.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 1_000_000, 1));
+        spQuantity.setEditable(true);
+        configureQuantitySpinnerCommit();
+
+        // Enter na quantidade adiciona item
+        spQuantity.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (e.getCode() == KeyCode.ENTER) {
+                commitQuantityEditor();
+                onAddItem();
+                e.consume();
             }
         });
 
-        spQuantity.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 1_000_000, 1));
+        // Seleciona tudo quando focar (pra digitar por cima)
+        Platform.runLater(() -> spQuantity.getEditor().focusedProperty().addListener((obs, was, is) -> {
+            if (is) spQuantity.getEditor().selectAll();
+        }));
 
         buildItemsTable();
         tableItems.setItems(items);
@@ -95,11 +112,121 @@ public class MovementFormController {
         fillSuggestedUnitPrice();
         refreshPartyForType();
 
-        btnAddItem.setOnAction(e -> onAddItem());
+        btnAddItem.setOnAction(e -> {
+            commitQuantityEditor();
+            onAddItem();
+        });
         btnNewParty.setOnAction(e -> onNewParty());
 
         updateTotal();
         updateSaveButtonState();
+    }
+
+    private void configureQuantitySpinnerCommit() {
+        SpinnerValueFactory.IntegerSpinnerValueFactory vf =
+                (SpinnerValueFactory.IntegerSpinnerValueFactory) spQuantity.getValueFactory();
+
+        vf.setConverter(new StringConverter<>() {
+            @Override public String toString(Integer value) {
+                return value == null ? "" : value.toString();
+            }
+
+            @Override public Integer fromString(String s) {
+                if (s == null) return 1;
+                String t = s.trim();
+                if (t.isEmpty()) return 1;
+                return Integer.parseInt(t); // inteiro
+            }
+        });
+
+        spQuantity.getEditor().setOnAction(e -> commitQuantityEditor());
+    }
+
+    private void commitQuantityEditor() {
+        try {
+            SpinnerValueFactory.IntegerSpinnerValueFactory vf =
+                    (SpinnerValueFactory.IntegerSpinnerValueFactory) spQuantity.getValueFactory();
+
+            Integer parsed = vf.getConverter().fromString(spQuantity.getEditor().getText());
+            if (parsed == null) parsed = 1;
+
+            // respeita limites do spinner
+            int min = 1;
+            int max = 1_000_000;
+            int v = Math.max(min, Math.min(max, parsed));
+
+            vf.setValue(v);
+            spQuantity.getEditor().setText(String.valueOf(v));
+        } catch (Exception ex) {
+            // volta para o último valor válido
+            SpinnerValueFactory<Integer> vf = spQuantity.getValueFactory();
+            Integer current = vf == null ? 1 : vf.getValue();
+            if (current == null) current = 1;
+            spQuantity.getEditor().setText(String.valueOf(current));
+        }
+    }
+
+    private void configureProductCombo() {
+        cbProduct.getItems().setAll(allProducts);
+
+        cbProduct.setCellFactory(listView -> new ListCell<>() {
+            @Override protected void updateItem(Product item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getName() + " (" + item.getSku() + ")");
+            }
+        });
+
+        cbProduct.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(Product item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getName() + " (" + item.getSku() + ")");
+            }
+        });
+    }
+
+    private void configureProductSearch() {
+        // Enter na busca: se tiver exatamente 1 resultado, seleciona e vai pra quantidade
+        txtProductSearch.setOnAction(e -> {
+            if (cbProduct.getValue() == null && cbProduct.getItems().size() == 1) {
+                cbProduct.getSelectionModel().select(0);
+            }
+
+            if (cbProduct.getValue() != null) {
+                spQuantity.requestFocus();
+            } else {
+                cbProduct.show();
+            }
+        });
+
+        txtProductSearch.textProperty().addListener((obs, old, val) -> {
+            productSearchDebounce.stop();
+            productSearchDebounce.setOnFinished(e -> filterProducts(val));
+            productSearchDebounce.playFromStart();
+        });
+    }
+
+    private void filterProducts(String term) {
+        String t = term == null ? "" : term.trim().toLowerCase();
+        if (t.isEmpty()) {
+            cbProduct.getItems().setAll(allProducts);
+            cbProduct.setValue(null);
+            return;
+        }
+
+        var filtered = allProducts.stream().filter(p -> {
+            String name = p.getName() == null ? "" : p.getName().toLowerCase();
+            String sku = p.getSku() == null ? "" : p.getSku().toLowerCase();
+            return name.contains(t) || sku.contains(t);
+        }).toList();
+
+        cbProduct.getItems().setAll(filtered);
+
+        if (filtered.size() == 1) {
+            cbProduct.getSelectionModel().select(filtered.getFirst());
+        } else {
+            cbProduct.setValue(null);
+            cbProduct.show();
+        }
     }
 
     private void configurePartyAutocomplete() {
@@ -112,8 +239,6 @@ public class MovementFormController {
 
             @Override
             public Party fromString(String s) {
-                // Não converte texto livre em Party.
-                // O usuário precisa selecionar um item da lista.
                 return null;
             }
         });
@@ -230,6 +355,9 @@ public class MovementFormController {
             Product product = cbProduct.getValue();
             if (product == null) throw new IllegalArgumentException("Selecione um produto.");
 
+            // garante que digitado foi commitado
+            commitQuantityEditor();
+
             int qty = spQuantity.getValue();
             if (qty <= 0) throw new IllegalArgumentException("Quantidade deve ser maior que zero.");
 
@@ -261,7 +389,11 @@ public class MovementFormController {
             updateSaveButtonState();
 
             spQuantity.getValueFactory().setValue(1);
-            cbProduct.requestFocus();
+
+            // fluxo rápido
+            txtProductSearch.clear();
+            cbProduct.setValue(null);
+            txtProductSearch.requestFocus();
         } catch (IllegalArgumentException e) {
             showError("Validação", e.getMessage());
         } catch (Exception e) {
@@ -311,7 +443,6 @@ public class MovementFormController {
             MovementType type = cbType.getValue();
             if (type == null) throw new IllegalArgumentException("Selecione o tipo.");
 
-            // IMPORTANTE: para ComboBox editável, use getValue()
             Party party = cbParty.getValue();
             if (party == null || party.getId() == null) {
                 throw new IllegalArgumentException("Selecione um " + (type == MovementType.SAIDA ? "cliente" : "fornecedor") + " na lista.");

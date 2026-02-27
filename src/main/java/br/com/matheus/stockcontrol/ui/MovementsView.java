@@ -12,6 +12,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -39,13 +40,28 @@ public class MovementsView extends BorderPane {
     public MovementsView(Runnable onStockChanged) {
         this.onStockChanged = onStockChanged;
 
-        setPadding(new Insets(10));
+        setPadding(new Insets(0));
 
+        setTop(buildTop());
+        setCenter(buildTable());
+
+        loadData();
+    }
+
+    private Parent buildTop() {
         Button btnNew = new Button("Nova movimentação");
+        btnNew.getStyleClass().add("btn-new");
+
+        // Filtrar e limpar ficam brancos (default)
+
         btnNew.setOnAction(e -> openMovementAndRefresh());
 
         cbType.getItems().setAll(MovementType.values());
         cbType.setPromptText("Tipo");
+        cbType.setPrefWidth(160);
+
+        dpStart.setPromptText("Início");
+        dpEnd.setPromptText("Fim");
 
         btnFilter.setOnAction(e -> loadData());
         btnClear.setOnAction(e -> {
@@ -55,26 +71,24 @@ public class MovementsView extends BorderPane {
             loadData();
         });
 
+        ToolBar actions = new ToolBar(btnNew);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
         HBox filters = new HBox(10,
                 new Label("Tipo:"), cbType,
                 new Label("Início:"), dpStart,
                 new Label("Fim:"), dpEnd,
+                spacer,
                 btnFilter, btnClear
         );
-        filters.setPadding(new Insets(10, 0, 10, 0));
+        filters.getStyleClass().add("filters-bar");
 
-        setTop(new javafx.scene.layout.VBox(10, new ToolBar(btnNew), filters));
-        setCenter(buildTable());
-
-        loadData();
-    }
-
-    private void openMovementAndRefresh() {
-        boolean saved = openMovementForm();
-        if (saved) {
-            loadData();
-            if (onStockChanged != null) onStockChanged.run();
-        }
+        var header = new javafx.scene.layout.VBox(10, actions, filters);
+        header.getStyleClass().add("view-header");
+        BorderPane.setMargin(header, new Insets(0, 0, 10, 0));
+        return header;
     }
 
     private Parent buildTable() {
@@ -88,11 +102,13 @@ public class MovementsView extends BorderPane {
         colDate.setCellValueFactory(new PropertyValueFactory<>("dateTime"));
         colDate.setCellFactory(tc -> new TableCell<>() {
             private final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-            @Override protected void updateItem(LocalDateTime value, boolean empty) {
+            @Override
+            protected void updateItem(LocalDateTime value, boolean empty) {
                 super.updateItem(value, empty);
                 setText(empty || value == null ? null : value.format(fmt));
             }
         });
+        colDate.setMaxWidth(170);
 
         TableColumn<StockMovement, String> colType = new TableColumn<>("Tipo");
         colType.setCellValueFactory(new PropertyValueFactory<>("type"));
@@ -131,7 +147,8 @@ public class MovementsView extends BorderPane {
     private TableCell<StockMovement, BigDecimal> moneyCell() {
         NumberFormat nf = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
         return new TableCell<>() {
-            @Override protected void updateItem(BigDecimal value, boolean empty) {
+            @Override
+            protected void updateItem(BigDecimal value, boolean empty) {
                 super.updateItem(value, empty);
                 setText(empty || value == null ? null : nf.format(value));
             }
@@ -170,6 +187,14 @@ public class MovementsView extends BorderPane {
         alert.showAndWait();
     }
 
+    private void openMovementAndRefresh() {
+        boolean saved = openMovementForm();
+        if (saved) {
+            loadData();
+            if (onStockChanged != null) onStockChanged.run();
+        }
+    }
+
     private boolean openMovementForm() {
         try {
             var url = getClass().getResource("/br/com/matheus/stockcontrol/ui/movement_form.fxml");
@@ -193,5 +218,9 @@ public class MovementsView extends BorderPane {
         } catch (Exception e) {
             throw new RuntimeException("Erro ao abrir formulário de movimentação", e);
         }
+    }
+
+    public void refresh() {
+        loadData();
     }
 }

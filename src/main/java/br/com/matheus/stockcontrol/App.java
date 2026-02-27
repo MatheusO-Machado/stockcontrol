@@ -1,6 +1,6 @@
 package br.com.matheus.stockcontrol;
 
-import br.com.matheus.stockcontrol.ui.ProductsView;
+import br.com.matheus.stockcontrol.ui.MainView;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
@@ -9,7 +9,14 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        stage.setScene(new javafx.scene.Scene(new br.com.matheus.stockcontrol.ui.MainView(), 900, 600));
+        MainView root = new MainView();
+        Scene scene = new Scene(root, 900, 600);
+
+        scene.getStylesheets().add(
+                getClass().getResource("/br/com/matheus/stockcontrol/ui/app.css").toExternalForm()
+        );
+
+        stage.setScene(scene);
         stage.setTitle("StockControl");
         stage.show();
     }

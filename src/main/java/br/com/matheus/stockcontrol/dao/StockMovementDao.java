@@ -173,8 +173,11 @@ public class StockMovementDao {
             VALUES (?, ?, ?, ?, ?)
         """;
 
-        String selectQty = "SELECT quantity FROM products WHERE id = ?";
-        String updateQty = "UPDATE products SET quantity = ? WHERE id = ?";
+        // Agora buscamos qty e cost_cents para aplicar CMP nas entradas
+        String selectProductState = "SELECT quantity, cost_cents FROM products WHERE id = ?";
+
+        // Atualiza qty e cost
+        String updateProductState = "UPDATE products SET quantity = ?, cost_cents = ? WHERE id = ?";
 
         try (var conn = Database.getConnection()) {
             conn.setAutoCommit(false);
@@ -186,10 +189,12 @@ public class StockMovementDao {
             // valida estoque para SAIDA
             if (type == MovementType.SAIDA) {
                 for (StockMovementItem it : normalized) {
-                    int currentQty = getCurrentQty(conn, selectQty, it.getProductId());
-                    int newQty = currentQty - it.getQuantity();
+                    ProductState st = getProductState(conn, selectProductState, it.getProductId());
+                    int newQty = st.quantity - it.getQuantity();
                     if (newQty < 0) {
-                        throw new IllegalArgumentException("Estoque insuficiente para o produto (id=" + it.getProductId() + "). Atual: " + currentQty);
+                        throw new IllegalArgumentException(
+                                "Estoque insuficiente para o produto (id=" + it.getProductId() + "). Atual: " + st.quantity
+                        );
                     }
                 }
             }
@@ -226,17 +231,36 @@ public class StockMovementDao {
                 }
             }
 
-            // Atualiza estoque
+            // Atualiza estoque e custo (CMP nas ENTRADAS)
             for (StockMovementItem it : normalized) {
-                int currentQty = getCurrentQty(conn, selectQty, it.getProductId());
+                ProductState st = getProductState(conn, selectProductState, it.getProductId());
 
                 int newQty = (type == MovementType.ENTRADA)
-                        ? Math.addExact(currentQty, it.getQuantity())
-                        : Math.subtractExact(currentQty, it.getQuantity());
+                        ? Math.addExact(st.quantity, it.getQuantity())
+                        : Math.subtractExact(st.quantity, it.getQuantity());
 
-                try (PreparedStatement ps = conn.prepareStatement(updateQty)) {
+                int newCostCents = st.costCents;
+
+                if (type == MovementType.ENTRADA) {
+                    int entryUnitCents = MoneyUtil.toCents(it.getUnitPrice());
+
+                    // CMP: (q*c + e*ce) / (q+e)
+                    long currentTotalCost = (long) st.quantity * (long) st.costCents;
+                    long entryTotalCost = (long) it.getQuantity() * (long) entryUnitCents;
+                    long denom = (long) st.quantity + (long) it.getQuantity();
+
+                    if (denom > 0) {
+                        // arredonda para o centavo mais próximo
+                        newCostCents = (int) Math.round((currentTotalCost + entryTotalCost) / (double) denom);
+                    } else {
+                        newCostCents = entryUnitCents;
+                    }
+                }
+
+                try (PreparedStatement ps = conn.prepareStatement(updateProductState)) {
                     ps.setInt(1, newQty);
-                    ps.setLong(2, it.getProductId());
+                    ps.setInt(2, newCostCents);
+                    ps.setLong(3, it.getProductId());
                     ps.executeUpdate();
                 }
             }
@@ -261,12 +285,23 @@ public class StockMovementDao {
         }
     }
 
-    private int getCurrentQty(java.sql.Connection conn, String selectQtySql, long productId) throws Exception {
-        try (PreparedStatement ps = conn.prepareStatement(selectQtySql)) {
+    private static class ProductState {
+        final int quantity;
+        final int costCents;
+        ProductState(int quantity, int costCents) {
+            this.quantity = quantity;
+            this.costCents = costCents;
+        }
+    }
+
+    private ProductState getProductState(java.sql.Connection conn, String selectSql, long productId) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
             ps.setLong(1, productId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) throw new IllegalArgumentException("Produto não encontrado (id=" + productId + ")");
-                return rs.getInt("quantity");
+                int qty = rs.getInt("quantity");
+                int cost = rs.getInt("cost_cents"); // pode ser 0
+                return new ProductState(qty, cost);
             }
         }
     }

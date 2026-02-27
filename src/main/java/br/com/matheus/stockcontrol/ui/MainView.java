@@ -1,75 +1,134 @@
 package br.com.matheus.stockcontrol.ui;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
+
+import java.util.List;
 
 public class MainView extends BorderPane {
 
-    private final TextField txtSearch = new TextField();
     private final Label lblTitle = new Label("StockControl");
 
-    private final Button btnProducts = new Button("Produtos");
-    private final Button btnMovements = new Button("Movimentações");
-    private final Button btnParties = new Button("Pessoas");
-    private final Button btnDashboard = new Button("Dashboard");
+    // Sidebar com ícones (Unicode)
+    private final Button btnDashboard = new Button("📊  Dashboard");
+    private final Button btnProducts = new Button("📦  Produtos");
+    private final Button btnCategories = new Button("🏷  Categorias");
+    private final Button btnMovements = new Button("📈  Movimentações");
+    private final Button btnParties = new Button("👥  Pessoas");
 
-    // Mantém instâncias para poder dar refresh sem recriar tudo
+    private final List<Button> navButtons = List.of(btnDashboard, btnProducts, btnCategories, btnMovements, btnParties);
+
     private final ProductsView productsView = new ProductsView();
-    private final MovementsView movementsView = new MovementsView(productsView::refresh);
+    private final DashboardView dashboardView = new DashboardView();
+    private final CategoriesView categoriesView = new CategoriesView();
+
+    private final MovementsView movementsView = new MovementsView(() -> {
+        productsView.refresh();
+        dashboardView.refresh();
+        categoriesView.refresh();
+    });
+
     private final PartiesView partiesView = new PartiesView();
 
+    // “Shell” do conteúdo
+    private final StackPane contentArea = new StackPane();
+    private final VBox contentContainer = new VBox();
+    private final BorderPane contentCard = new BorderPane();
+
     public MainView() {
-        setPadding(new Insets(10));
+        setPadding(Insets.EMPTY);
 
-        // Top: título + busca (por enquanto, não conectada ao ProductsView)
-        var topBar = new ToolBar();
-        lblTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        txtSearch.setPromptText("Buscar por Nome ou SKU...");
-        txtSearch.setPrefWidth(300);
-
-        topBar.getItems().addAll(lblTitle, new Separator(), txtSearch);
+        // ---------- Top bar ----------
+        ToolBar topBar = new ToolBar();
+        lblTitle.getStyleClass().add("page-title");
+        topBar.getItems().add(lblTitle);
         setTop(topBar);
 
-        // Left: menu
-        btnProducts.setMaxWidth(Double.MAX_VALUE);
-        btnMovements.setMaxWidth(Double.MAX_VALUE);
-        btnParties.setMaxWidth(Double.MAX_VALUE);
-        btnDashboard.setMaxWidth(Double.MAX_VALUE);
+        // ---------- Sidebar ----------
+        for (Button b : navButtons) setupMenuButton(b);
 
-        var leftMenu = new VBox(8, btnProducts, btnMovements, btnParties, btnDashboard);
-        leftMenu.setPadding(new Insets(10, 10, 10, 0));
-        leftMenu.setPrefWidth(160);
+        Label sideTitle = new Label("Menu");
+        sideTitle.getStyleClass().add("side-title");
+
+        VBox leftMenu = new VBox(10, sideTitle, btnDashboard, btnProducts, btnCategories, btnMovements, btnParties);
+        leftMenu.getStyleClass().add("side-menu");
+        leftMenu.setPrefWidth(240);
+        leftMenu.setAlignment(Pos.TOP_LEFT);
         setLeft(leftMenu);
 
-        // Center: default
-        showProducts();
+        // ---------- Content shell ----------
+        contentArea.getStyleClass().add("content-area");
 
-        // Navegação
+        contentContainer.getStyleClass().add("content-container");
+        contentContainer.setFillWidth(true);
+        contentContainer.setAlignment(Pos.TOP_CENTER);
+
+        contentCard.getStyleClass().add("content-card");
+
+        contentContainer.getChildren().add(contentCard);
+        contentArea.getChildren().add(contentContainer);
+        setCenter(contentArea);
+
+        // handlers
+        btnDashboard.setOnAction(e -> showDashboard());
         btnProducts.setOnAction(e -> showProducts());
+        btnCategories.setOnAction(e -> showCategories());
         btnMovements.setOnAction(e -> showMovements());
         btnParties.setOnAction(e -> showParties());
-        btnDashboard.setOnAction(e -> showDashboard());
+
+        showDashboard();
     }
 
-    private void showProducts() {
-        setCenter(productsView);
-        lblTitle.setText("Produtos");
+    private void setupMenuButton(Button b) {
+        b.setMaxWidth(Double.MAX_VALUE);
+        b.getStyleClass().add("menu-button");
+        b.setContentDisplay(ContentDisplay.LEFT);
+        b.setWrapText(false);
     }
 
-    private void showMovements() {
-        setCenter(movementsView);
-        lblTitle.setText("Movimentações");
+    private void setActive(Button active) {
+        for (Button b : navButtons) b.getStyleClass().remove("active");
+        active.getStyleClass().add("active");
     }
 
-    private void showParties() {
-        setCenter(partiesView);
-        lblTitle.setText("Pessoas");
+    private void setContent(Node node) {
+        contentCard.setCenter(node);
+        BorderPane.setMargin(node, new Insets(6));
     }
 
     private void showDashboard() {
-        setCenter(new Label("Dashboard (em construção)"));
+        setActive(btnDashboard);
         lblTitle.setText("Dashboard");
+        setContent(dashboardView);
+        dashboardView.refresh();
+    }
+
+    private void showProducts() {
+        setActive(btnProducts);
+        lblTitle.setText("Produtos");
+        setContent(productsView);
+        productsView.refresh();
+    }
+
+    private void showCategories() {
+        setActive(btnCategories);
+        lblTitle.setText("Categorias");
+        setContent(categoriesView);
+        categoriesView.refresh();
+    }
+
+    private void showMovements() {
+        setActive(btnMovements);
+        lblTitle.setText("Movimentações");
+        setContent(movementsView);
+    }
+
+    private void showParties() {
+        setActive(btnParties);
+        lblTitle.setText("Pessoas");
+        setContent(partiesView);
     }
 }

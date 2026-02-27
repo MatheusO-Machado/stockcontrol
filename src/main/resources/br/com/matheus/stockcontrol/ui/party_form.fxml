@@ -50,6 +50,11 @@
                         <Label text="E-mail:" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
                         <TextField fx:id="txtEmail" promptText="opcional"
                                    GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+
+                        <!-- NOVO -->
+                        <Label text="Status:" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+                        <CheckBox fx:id="chkActive" text="Cadastro ativo" selected="true"
+                                  GridPane.rowIndex="6" GridPane.columnIndex="1"/>
                     </GridPane>
                 </content>
             </Tab>

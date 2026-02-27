@@ -1,0 +1,279 @@
+/* ===== StockControl - Professional Light Theme (ERP) ===== */
+
+.root {
+    -fx-font-family: "Segoe UI", "Inter", "Roboto", "Arial";
+    -fx-font-size: 13px;
+
+    /* base */
+    -fx-background-color: #F3F4F6;
+
+    /* brand */
+    -fx-accent: #2563EB;
+    -fx-focus-color: #2563EB;
+    -fx-faint-focus-color: rgba(37, 99, 235, 0.12);
+}
+
+/* ---------- Top bar ---------- */
+.tool-bar {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 10 12;
+}
+
+.label.page-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #111827;
+}
+
+/* ---------- Sidebar (ERP) ---------- */
+.vbox.side-menu {
+    -fx-background-color: #1F2937;
+    -fx-padding: 14px;
+    -fx-spacing: 10px;
+}
+
+.label.side-title {
+    -fx-text-fill: rgba(255,255,255,0.75);
+    -fx-font-weight: 800;
+    -fx-padding: 0 0 6 2;
+}
+
+.button.menu-button {
+    -fx-background-color: rgba(255,255,255,0.06);
+    -fx-border-color: rgba(255,255,255,0.14);
+    -fx-border-width: 1;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+
+    -fx-padding: 12 14;
+    -fx-min-height: 44;
+
+    -fx-alignment: CENTER_LEFT;
+    -fx-font-weight: 800;
+    -fx-text-fill: #FFFFFF;
+}
+
+.button.menu-button:hover {
+    -fx-background-color: rgba(255,255,255,0.10);
+    -fx-border-color: rgba(37, 99, 235, 0.55);
+}
+
+.button.menu-button.active {
+    -fx-background-color: rgba(37, 99, 235, 0.26);
+    -fx-border-color: rgba(37, 99, 235, 0.80);
+}
+
+/* ---------- Content shell ---------- */
+.content-area {
+    -fx-background-color: transparent;
+    -fx-padding: 18px;
+}
+
+.content-container {
+    -fx-max-width: 1180px;
+    -fx-pref-width: 1180px;
+}
+
+.content-card {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+    -fx-padding: 14px;
+
+    /* sombra leve */
+    -fx-effect: dropshadow(gaussian, rgba(17, 24, 39, 0.10), 18, 0.20, 0, 6);
+}
+
+/* ---------- Typography ---------- */
+.label { -fx-text-fill: #111827; }
+.text { -fx-fill: #111827; }
+
+/* Textos secundários (para labels dentro de filtros, etc.) */
+.secondary-text { -fx-text-fill: #6B7280; }
+
+/* ---------- Buttons (base: branco) ---------- */
+.button, .toggle-button {
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-padding: 9 14;
+    -fx-font-weight: 800;
+
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-text-fill: #111827;
+}
+
+.button:hover, .toggle-button:hover {
+    -fx-background-color: #F9FAFB;
+}
+
+/* NOVO (azul, menos vibrante) */
+.button.btn-new {
+    -fx-background-color: #2563EB;
+    -fx-border-color: #1D4ED8;
+    -fx-text-fill: #FFFFFF;
+}
+.button.btn-new:hover {
+    -fx-background-color: #1D4ED8;
+}
+
+/* EDITAR (amarelo/âmbar suave, sem neon) */
+.button.btn-edit {
+    -fx-background-color: #F59E0B;
+    -fx-border-color: #D97706;
+    -fx-text-fill: #111827;
+}
+.button.btn-edit:hover {
+    -fx-background-color: #D97706;
+    -fx-text-fill: #111827;
+}
+
+/* EXCLUIR (vermelho mais sóbrio) */
+.button.btn-delete {
+    -fx-background-color: #DC2626;
+    -fx-border-color: #B91C1C;
+    -fx-text-fill: #FFFFFF;
+}
+.button.btn-delete:hover {
+    -fx-background-color: #B91C1C;
+}
+
+/* Foco/teclado */
+.button:focused, .toggle-button:focused {
+    -fx-border-color: rgba(37, 99, 235, 0.75);
+    -fx-effect: dropshadow(gaussian, rgba(37,99,235,0.25), 10, 0.25, 0, 0);
+}
+
+/* ---------- Inputs ---------- */
+.text-field, .combo-box, .date-picker, .spinner, .text-area {
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-border-color: #D1D5DB;
+    -fx-background-color: #FFFFFF;
+}
+
+.text-field:focused, .combo-box:focused, .date-picker:focused, .spinner:focused, .text-area:focused {
+    -fx-border-color: rgba(37, 99, 235, 0.75);
+}
+
+/* ---------- Header / Filters containers ---------- */
+.view-header {
+    -fx-padding: 2 2 12 2;
+    -fx-spacing: 10;
+}
+
+.filters-bar {
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-padding: 10;
+    -fx-spacing: 10;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.filters-bar .label {
+    -fx-text-fill: #6B7280;
+    -fx-font-weight: 800;
+}
+
+/* ---------- Tables (profissionais) ---------- */
+.table-view {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-radius: 14px;
+    -fx-background-radius: 14px;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #F9FAFB;
+    -fx-background-radius: 14px 14px 0 0;
+}
+
+.table-view .column-header, .table-view .filler {
+    -fx-size: 38px;
+    -fx-border-color: transparent transparent #E5E7EB transparent;
+    -fx-background-color: transparent;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #111827;
+    -fx-font-weight: 900;
+}
+
+/* zebra + hover + seleção */
+.table-row-cell:odd { -fx-background-color: #FCFCFD; }
+.table-row-cell:hover { -fx-background-color: rgba(37, 99, 235, 0.06); }
+.table-row-cell:filled:selected, .table-row-cell:filled:selected:focused {
+    -fx-background-color: rgba(37, 99, 235, 0.18);
+}
+
+/* gridlines mais suaves */
+.table-view .table-cell {
+    -fx-border-color: transparent transparent rgba(229,231,235,0.9) transparent;
+}
+
+/* Destaques de estoque por pseudo-class (ProductsView) */
+.table-row-cell:stock-zero { -fx-background-color: rgba(220, 38, 38, 0.12); }
+.table-row-cell:stock-low  { -fx-background-color: rgba(245, 158, 11, 0.12); }
+
+/* ---------- Dialogs ---------- */
+.dialog-pane {
+    -fx-background-color: #FFFFFF;
+}
+.dialog-pane .header-panel {
+    -fx-background-color: #FFFFFF;
+}
+
+/* ---------- TitledPane ---------- */
+.titled-pane > .title {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-padding: 10 12;
+}
+
+.titled-pane > .title .text {
+    -fx-fill: #111827;
+    -fx-font-weight: 900;
+}
+
+.titled-pane > *.content {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+/* ---------- Charts ---------- */
+.chart {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-padding: 10px;
+}
+
+.chart-title {
+    -fx-text-fill: #111827;
+    -fx-font-weight: 900;
+}
+
+.axis-label, .axis-tick-label { -fx-text-fill: #6B7280; }
+
+.separator .line { -fx-border-color: #E5E7EB; }
+
+/* ---------- ScrollBar (um pouco mais clean) ---------- */
+.scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb {
+    -fx-background-color: rgba(107,114,128,0.35);
+    -fx-background-radius: 10px;
+}
+.scroll-bar:vertical .thumb:hover, .scroll-bar:horizontal .thumb:hover {
+    -fx-background-color: rgba(107,114,128,0.50);
+}
