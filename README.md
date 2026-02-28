@@ -1,7 +1,12 @@
 # StockControl — Controle de Estoque (JavaFX + SQLite)
 
 Aplicação desktop de controle de estoque construída com **Java 21**, **JavaFX 21** e **SQLite**.  
-O projeto consolida conceitos de **CRUD**, **movimentação de estoque**, **integridade referencial (FK)**, **migrações de banco**, e uma UI com estilo “ERP” usando **FXML + CSS**.
+O objetivo do projeto é entregar uma base **simples e consistente** (estilo ERP) com foco em:
+
+- **CRUD** com UI JavaFX (FXML + CSS)
+- **Movimentações** (entrada/saída) controlando o estoque
+- **Integridade referencial (Foreign Keys)** para preservar histórico
+- **Migrações** de banco (`PRAGMA user_version`)
 
 Repositório: https://github.com/MatheusO-Machado/stockcontrol
 
@@ -36,39 +41,34 @@ Repositório: https://github.com/MatheusO-Machado/stockcontrol
   - Preço de venda
   - Estoque mínimo
 - **SKU automático** no cadastro (ex.: `SKU-001`, `SKU-002`, ...).
-- **Estoque controlado exclusivamente por movimentações**:
-  - O campo **Quantidade** não é editado manualmente no cadastro (evita inconsistências).
-- Destaque visual na tabela (JavaFX pseudo-class + CSS):
-  - **Estoque zerado** (vermelho)
-  - **Estoque baixo** (laranja) quando `quantidade <= estoque mínimo`
-- **Ativar/Inativar**:
-  - Produto pode ser inativado (em vez de excluído).
-  - Filtro **“Mostrar inativos”** na listagem.
+- **Estoque controlado por movimentações** (quantidade não é editada manualmente no cadastro).
+- Destaque visual na tabela (pseudo-classes JavaFX + CSS):
+  - **Estoque zerado** (destaque vermelho)
+  - **Estoque baixo** (destaque laranja) quando `quantidade <= estoque mínimo`
+- **Ativar / Inativar** produto e filtro **“Mostrar inativos”**.
 - **Exclusão protegida**:
-  - Não permite excluir produto que já teve movimentações (integridade via Foreign Key).
-  - Quando a exclusão não é possível, a interface sugere **inativar**.
+  - Produto com movimentações não pode ser excluído (FK).
+  - A interface sugere **inativar** quando a exclusão é bloqueada.
 
 ### Categorias
 - Cadastro de categorias.
 - Categoria padrão/fallback (ex.: “Geral”) para facilitar uso inicial.
 
 ### Pessoas (Clientes/Fornecedores)
-- Cadastro de pessoas com:
+- Cadastro com:
   - Tipo: **Cliente** ou **Fornecedor**
-  - Documento **CPF/CNPJ** com validação (apenas dígitos + validação)
+  - Documento **CPF/CNPJ** com validação
   - Contato e endereço
-- **Ativar/Inativar**:
-  - Pessoas podem ser inativadas para “sair da operação” sem perder histórico.
-  - Filtro **“Mostrar inativos”** na listagem.
+- **Ativar / Inativar** e filtro **“Mostrar inativos”**.
 - **Exclusão protegida**:
-  - Não permite excluir pessoa com movimentações vinculadas (integridade via Foreign Key).
-  - Quando a exclusão não é possível, a interface sugere **inativar**.
+  - Pessoa com movimentações não pode ser excluída (FK).
+  - A interface sugere **inativar** quando a exclusão é bloqueada.
 
 ### Movimentações (Entrada/Saída)
-- Registro de movimentações com cabeçalho e itens:
+- Movimentações com cabeçalho e itens:
   - **Entrada** vinculada a **Fornecedor**
   - **Saída** vinculada a **Cliente**
-- Itens: produto, quantidade, valor unitário e subtotal.
+- Registro de itens com quantidade, valor unitário e subtotal.
 - Atualização de estoque conforme movimentação.
 
 ### Dashboard
@@ -79,30 +79,98 @@ Repositório: https://github.com/MatheusO-Machado/stockcontrol
 ## Regras de negócio (importantes)
 
 ### 1) Estoque não é “digitado”: é calculado por movimentações
-Para evitar divergências, o estoque do produto não é alterado diretamente pelo usuário no cadastro.  
-O estoque é impactado somente por:
+Para evitar divergências, o estoque do produto **não é alterado diretamente** no cadastro.  
+O estoque é impactado somente por movimentações:
+
 - **Entrada**: soma no estoque
 - **Saída**: subtrai do estoque
 
-Isso facilita auditoria e mantém consistência com o histórico.
+Benefícios:
+- Menos inconsistência
+- Melhor auditoria (histórico de como chegou naquele número)
+- Facilidade para evoluir com relatórios
 
 ### 2) Integridade referencial: histórico é preservado
-O projeto usa **Foreign Keys** no SQLite (`PRAGMA foreign_keys = ON`) para garantir integridade:
-- Se um **produto** já foi usado em movimentações, ele **não pode ser excluído**
-- Se uma **pessoa** (cliente/fornecedor) já foi usada em movimentações, ela **não pode ser excluída**
+O projeto usa **Foreign Keys** no SQLite (com `PRAGMA foreign_keys = ON`) para impedir exclusões que quebrariam o histórico:
 
-Em ambos os casos, o caminho recomendado é:
-- **inativar** (campo `active = 0`) para remover da operação sem apagar dados.
+- Produto usado em movimentações → **não pode excluir**
+- Pessoa (cliente/fornecedor) usada em movimentações → **não pode excluir**
 
-### 3) Ativo/Inativo
-- Registros inativos não aparecem por padrão
-- É possível marcar “**Mostrar inativos**”
-- O usuário pode **Reativar** a qualquer momento
+Quando isso acontece, o comportamento esperado é:
+- **Manter o registro**
+- **Inativar** (`active = 0`) para tirar da operação sem perder histórico
+
+### 3) Ativo/Inativo (soft delete)
+Em vez de apagar dados que já se conectam ao histórico, o sistema trabalha com status:
+
+- **Ativo**: aparece por padrão nas listagens
+- **Inativo**: só aparece se marcar **“Mostrar inativos”**
+- É possível **Reativar** quando necessário
 
 ### 4) Estoque mínimo e alerta visual
-Cada produto tem um **estoque mínimo**. A listagem aplica destaque visual:
-- `quantidade == 0` → **estoque zerado**
-- `quantidade <= estoqueMinimo` → **estoque baixo**
+O estoque mínimo serve como “ponto de atenção” para reposição. Na listagem:
+
+- `quantidade == 0` → **estoque zerado** (destaque vermelho)
+- `quantidade <= estoqueMinimo` → **estoque baixo** (destaque laranja)
+
+---
+
+## Arquitetura (visão geral)
+
+Organização em camadas simples:
+
+1. **UI (Views JavaFX)**  
+   Telas como `ProductsView`, `MovementsView`, `PartiesView`, etc.
+
+2. **Controllers (Forms)**  
+   Controllers FXML como `ProductFormController`, responsáveis por:
+   - Ler dados do formulário
+   - Validar entrada
+   - Chamar DAOs
+   - Fechar modal e retornar status de “salvou/cancelou”
+
+3. **DAO (Acesso a dados)**  
+   Classes como `ProductDao`, `PartyDao`, `StockMovementDao`:
+   - Executam SQL
+   - Aplicam regras de integridade e validação
+   - Retornam modelos (`Product`, `Party`, ...)
+
+4. **DB (Conexão + Migrações)**  
+   `Database` concentra:
+   - conexão SQLite
+   - `PRAGMA foreign_keys`
+   - migrações versionadas via `user_version`
+
+---
+
+## Diagramas (fluxo e arquitetura)
+
+### Fluxo de estoque (Entrada/Saída → Atualiza estoque)
+
+```mermaid
+flowchart LR
+  A[Usuário cria Movimentação] --> B{Tipo}
+  B -->|Entrada| C[Seleciona Fornecedor]
+  B -->|Saída| D[Seleciona Cliente]
+  C --> E[Adiciona Itens (produto, qtd, valor)]
+  D --> E
+  E --> F[Salvar Movimentação]
+  F --> G[Persistir cabeçalho + itens (SQLite)]
+  G --> H[Atualizar estoque do produto]
+  H --> I[Produtos exibem alerta: baixo/zerado]
+```
+
+### Camadas do projeto (UI → DAO → DB)
+
+```mermaid
+flowchart TB
+  UI[UI JavaFX (Views)] --> CT[Controllers (Forms)]
+  CT --> DAO[DAO (SQL / Regras)]
+  DAO --> DB[Database (SQLite + Migrações)]
+  DB --> DAO
+  DAO --> CT
+  CT --> UI
+```
 
 ---
 
@@ -111,7 +179,7 @@ Cada produto tem um **estoque mínimo**. A listagem aplica destaque visual:
 - **JavaFX 21**
 - **SQLite** (JDBC)
 - **Maven**
-- UI com **FXML** e tema em **CSS** (`app.css`)
+- UI com **FXML** + tema em **CSS** (`app.css`)
 
 ---
 
@@ -143,39 +211,42 @@ mvn clean javafx:run
 ## Banco de dados e migrações
 
 - O SQLite é criado automaticamente em: `./data/stockcontrol.db`
-- O projeto versiona o schema com:
+- O projeto usa versionamento de schema via:
   - `PRAGMA user_version`
 
-Ao iniciar a aplicação:
+Ao iniciar:
 1. Verifica a versão do banco
 2. Executa migrações necessárias
-3. Atualiza `user_version`
+3. Atualiza a versão
 
 E também garante:
 - `PRAGMA foreign_keys = ON` em cada conexão
 
 ---
 
-## Estrutura do projeto (resumo)
-
-- `src/main/java/.../ui/`  
-  Telas (Views) JavaFX
-- `src/main/java/.../ui/controller/`  
-  Controllers dos formulários e ações
-- `src/main/java/.../dao/`  
-  DAOs (acesso ao SQLite)
-- `src/main/java/.../db/`  
-  Conexão e migrações do banco
-- `src/main/resources/.../ui/`  
-  FXML e CSS (`app.css`)
-- `docs/images/`  
-  Screenshots para documentação
+## Estrutura do projeto
+- `src/main/java/.../ui/` telas (Views)
+- `src/main/java/.../ui/controller/` controllers (forms)
+- `src/main/java/.../dao/` DAOs (SQLite)
+- `src/main/java/.../db/` conexão e migrações
+- `src/main/resources/.../ui/` FXML e CSS
+- `docs/images/` screenshots do projeto
 
 ---
 
 ## Próximos passos (ideias)
 - Relatórios (CSV/PDF)
-- Gráficos no dashboard (KPI)
-- Exportação/importação
-- Testes automatizados para DAOs/migrações
-- Melhorias de validação (telefone, CEP, etc.)
+- KPIs e gráficos no dashboard
+- Exportação/importação de dados
+- Testes automatizados (DAO/migrações)
+- Melhorias de validação (telefone, CEP etc.)
+
+---
+
+## Licença
+Este projeto está sob a licença **CC BY-NC 4.0 (Atribuição — Não Comercial)**.
+
+- Você pode **usar, modificar e redistribuir** para fins **não comerciais** (ex.: estudos).
+- É **proibido** qualquer uso **comercial**.
+
+Veja: [LICENSE](LICENSE).
