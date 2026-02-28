@@ -145,28 +145,28 @@ Organização em camadas simples:
 
 ## Diagramas (fluxo e arquitetura)
 
-### Fluxo de estoque (Entrada/Saída → Atualiza estoque)
+### Fluxo de estoque (Entrada/Saida -> Atualiza estoque)
 
 ```mermaid
 flowchart LR
-  A[Usuário cria Movimentação] --> B{Tipo}
-  B -->|Entrada| C[Seleciona Fornecedor]
-  B -->|Saída| D[Seleciona Cliente]
-  C --> E[Adiciona Itens (produto, qtd, valor)]
+  A["Usuario cria Movimentacao"] --> B{"Tipo"}
+  B -->|"Entrada"| C["Seleciona Fornecedor"]
+  B -->|"Saida"| D["Seleciona Cliente"]
+  C --> E["Adiciona Itens (produto, qtd, valor)"]
   D --> E
-  E --> F[Salvar Movimentação]
-  F --> G[Persistir cabeçalho + itens (SQLite)]
-  G --> H[Atualizar estoque do produto]
-  H --> I[Produtos exibem alerta: baixo/zerado]
+  E --> F["Salvar Movimentacao"]
+  F --> G["Persistir cabecalho + itens (SQLite)"]
+  G --> H["Atualizar estoque do produto"]
+  H --> I["Produtos exibem alerta: baixo/zerado"]
 ```
 
-### Camadas do projeto (UI → DAO → DB)
+### Camadas do projeto (UI -> DAO -> DB)
 
 ```mermaid
 flowchart TB
-  UI[UI JavaFX (Views)] --> CT[Controllers (Forms)]
-  CT --> DAO[DAO (SQL / Regras)]
-  DAO --> DB[Database (SQLite + Migrações)]
+  UI["UI JavaFX (Views)"] --> CT["Controllers (Forms)"]
+  CT --> DAO["DAO (SQL / Regras)"]
+  DAO --> DB["Database (SQLite + Migracoes)"]
   DB --> DAO
   DAO --> CT
   CT --> UI
